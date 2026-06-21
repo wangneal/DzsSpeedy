@@ -34,7 +34,7 @@ function Row({ label, children }: { label: React.ReactNode; children: React.Reac
 
 export default function SettingsManager() {
   const { t } = useTranslation();
-  const { settings, set } = useSettings();
+  const { settings, set, get } = useSettings();
   const { register, unregister } = useShortcut();
   const { notify } = useSnackbar();
 
@@ -90,7 +90,7 @@ export default function SettingsManager() {
               <TableCell sx={{ borderBottom: "none" }}>{t("settings.increase")}</TableCell>
               <TableCell sx={{ borderBottom: "none" }}>
                 <ShortcutField value={settings.increaseSpeedShortcut} onChange={v => changeShortcut("increaseSpeedShortcut", settings.increaseSpeedShortcut, v, () => {
-                  invoke<number | null>("bridge_get_speed").then(c => { const n = (c ?? 1) + ((settings.increaseSpeedStep as number) || 0.5); invoke("bridge_set_speed", { factor: n }); set("speed", n); });
+                  invoke<number | null>("bridge_get_speed").then(c => { const n = (c ?? 1) + ((get("increaseSpeedStep") as number) || 0.5); invoke("bridge_set_speed", { factor: n }); set("speed", n); });
                 })} />
               </TableCell>
               <TableCell sx={{ borderBottom: "none" }}>
@@ -104,7 +104,7 @@ export default function SettingsManager() {
               <TableCell sx={{ borderBottom: "none" }}>{t("settings.decrease")}</TableCell>
               <TableCell sx={{ borderBottom: "none" }}>
                 <ShortcutField value={settings.decreaseSpeedShortcut} onChange={v => changeShortcut("decreaseSpeedShortcut", settings.decreaseSpeedShortcut, v, () => {
-                  invoke<number | null>("bridge_get_speed").then(c => { const n = Math.max(0.01, (c ?? 1) - ((settings.decreaseSpeedStep as number) || 0.5)); invoke("bridge_set_speed", { factor: n }); set("speed", n); });
+                  invoke<number | null>("bridge_get_speed").then(c => { const n = Math.max(0.01, (c ?? 1) - ((get("decreaseSpeedStep") as number) || 0.5)); invoke("bridge_set_speed", { factor: n }); set("speed", n); });
                 })} />
               </TableCell>
               <TableCell sx={{ borderBottom: "none" }}>
@@ -157,7 +157,7 @@ export default function SettingsManager() {
                   <ShortcutField
                     value={settings[`gear${gear}Shortcut` as keyof SettingsState] as string}
                     onChange={v => changeShortcut(`gear${gear}Shortcut` as keyof SettingsState, settings[`gear${gear}Shortcut` as keyof SettingsState] as string, v, () => {
-                      const gs = (settings[`gear${gear}Speed` as keyof SettingsState] as number) || 1;
+                      const gs = (get(`gear${gear}Speed` as keyof SettingsState) as number) || 1;
                       invoke("bridge_set_speed", { factor: gs }); set("speed", gs);
                     })}
                   />
