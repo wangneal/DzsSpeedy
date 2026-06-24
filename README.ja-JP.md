@@ -132,6 +132,8 @@ OpenSpeedy は以下の Windows システム時間関数をフックすること
 | QueryPerformanceCounter | kernel32.dll | 高精度パフォーマンスカウンター |
 | GetSystemTimeAsFileTime | kernel32.dll | システム時刻を取得 |
 | GetSystemTimePreciseAsFileTime | kernel32.dll | 高精度システム時刻を取得 |
+| SetWaitableTimer | kernel32.dll | 待機可能タイマーを設定 |
+| SetWaitableTimerEx | kernel32.dll | 待機可能タイマーを設定 (拡張) |
 
 # ⚠️ 注意事項
 - 本ツールは学習および研究目的のみに使用してください
@@ -153,6 +155,8 @@ OpenSpeedy は GPL v3 ライセンスに基づいています。
 OpenSpeedy は以下のプロジェクトのソースコードを使用しています。オープンソースコミュニティに感謝します！OpenSpeedy がお役に立ったら、Star をお願いします！
 - [minhook](https://github.com/TsudaKageyu/minhook): APIフック用
 - [tauri](https://tauri.app/): GUI
+- [MUI](https://mui.com/): UIコンポーネントライブラリ
+- [Ant Design](https://ant.design/): UI分割パネルコンポーネント
 
 免責事項: OpenSpeedy は教育および研究目的のみを目的としています。ユーザーは本ソフトウェアの使用に関連するすべてのリスクと責任を負うものとします。作者は本ソフトウェアの使用に起因するいかなる損失または法的責任についても責任を負いません。
 

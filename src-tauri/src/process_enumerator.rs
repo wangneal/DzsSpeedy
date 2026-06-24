@@ -9,12 +9,16 @@ use windows::Win32::Graphics::Gdi::{
     BITMAPINFOHEADER, DIB_RGB_COLORS,
 };
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, Process32FirstW, Process32NextW,
+    MODULEENTRY32W, PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPPROCESS,
 };
 use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::Threading::{
-    IsWow64Process, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+    IsWow64Process, OpenProcess, OpenProcessToken, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ,
+};
+use windows::Win32::Security::{
+    GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
 };
 use windows::Win32::UI::Shell::ExtractIconExW;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -30,6 +34,7 @@ struct CachedInfo {
     window_title: Option<String>,
     memory_kb: u64,
     exe_path: Option<String>,
+    admin: bool,
 }
 
 fn cache() -> &'static Mutex<HashMap<u32, CachedInfo>> {
@@ -43,10 +48,11 @@ fn cache_get(pid: u32) -> Option<CachedInfo> {
         window_title: c.window_title.clone(),
         memory_kb: c.memory_kb,
         exe_path: c.exe_path.clone(),
+        admin: c.admin,
     })
 }
 
-fn cache_set(pid: u32, arch: String, window_title: Option<String>, memory_kb: u64, exe_path: Option<String>) {
+fn cache_set(pid: u32, arch: String, window_title: Option<String>, memory_kb: u64, exe_path: Option<String>, admin: bool) {
     if let Ok(mut cache) = cache().lock() {
         cache.insert(
             pid,
@@ -55,6 +61,7 @@ fn cache_set(pid: u32, arch: String, window_title: Option<String>, memory_kb: u6
                 window_title,
                 memory_kb,
                 exe_path,
+                admin,
             },
         );
     }
@@ -79,6 +86,60 @@ pub struct ProcessInfo {
     pub window_title: Option<String>,
     pub memory_kb: u64,
     pub exe_path: Option<String>,
+    pub admin: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ModuleInfo {
+    pub name: String,
+    pub path: String,
+    pub base_address: u64,
+    pub size: u32,
+}
+
+// ---------------------------------------------------------------------------
+// Module enumeration for a single process
+// ---------------------------------------------------------------------------
+pub fn enumerate_modules(pid: u32) -> Vec<ModuleInfo> {
+    let mut modules = Vec::new();
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid) };
+    if snapshot.is_err() {
+        return modules;
+    }
+    let snapshot = snapshot.unwrap();
+
+    let mut entry = MODULEENTRY32W {
+        dwSize: std::mem::size_of::<MODULEENTRY32W>() as u32,
+        ..Default::default()
+    };
+
+    if unsafe { Module32FirstW(snapshot, &mut entry) }.is_ok() {
+        loop {
+            let name = String::from_utf16_lossy(&entry.szModule)
+                .trim_end_matches('\0')
+                .to_string();
+            let path = String::from_utf16_lossy(&entry.szExePath)
+                .trim_end_matches('\0')
+                .to_string();
+
+            if !name.is_empty() {
+                modules.push(ModuleInfo {
+                    name,
+                    path,
+                    base_address: entry.modBaseAddr as u64,
+                    size: entry.modBaseSize,
+                });
+            }
+
+            if unsafe { Module32NextW(snapshot, &mut entry) }.is_err() {
+                break;
+            }
+        }
+    }
+
+    let _ = unsafe { CloseHandle(snapshot) };
+    modules
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +176,14 @@ pub fn enumerate_processes_fast() -> Vec<ProcessInfo> {
                         window_title: cached.window_title,
                         memory_kb: cached.memory_kb,
                         exe_path: cached.exe_path,
+                        admin: cached.admin,
                     });
                 } else {
-                    // New process — eagerly fetch arch + exe path (cheapest), defer memory+title
+                    // New process — eagerly fetch arch + exe path + admin (cheapest), defer memory+title
                     let arch = detect_arch(pid);
                     let exe_path = get_exe_path(pid);
-                    cache_set(pid, arch.clone(), None, 0, exe_path.clone());
+                    let admin = is_admin(pid);
+                    cache_set(pid, arch.clone(), None, 0, exe_path.clone(), admin);
                     processes.push(ProcessInfo {
                         pid,
                         name,
@@ -128,6 +191,7 @@ pub fn enumerate_processes_fast() -> Vec<ProcessInfo> {
                         window_title: None,
                         memory_kb: 0,
                         exe_path,
+                        admin,
                     });
                 }
             }
@@ -171,8 +235,9 @@ pub fn enumerate_processes_full() -> Vec<ProcessInfo> {
                 let window_title = find_window_title(pid);
                 let memory_kb = get_memory_kb(pid);
                 let exe_path = get_exe_path(pid);
+                let admin = is_admin(pid);
 
-                cache_set(pid, arch.clone(), window_title.clone(), memory_kb, exe_path.clone());
+                cache_set(pid, arch.clone(), window_title.clone(), memory_kb, exe_path.clone(), admin);
 
                 processes.push(ProcessInfo {
                     pid,
@@ -181,6 +246,7 @@ pub fn enumerate_processes_full() -> Vec<ProcessInfo> {
                     window_title,
                     memory_kb,
                     exe_path,
+                    admin,
                 });
             }
 
@@ -388,6 +454,41 @@ fn icon_to_png_data(
 
     let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_bytes);
     Some(format!("data:image/png;base64,{}", b64))
+}
+
+fn is_admin(pid: u32) -> bool {
+    if pid == 0 { return false; }
+
+    // Try hardest first, fall back to limited (works on protected processes)
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, false, pid) }
+        .or_else(|_| unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) });
+    let handle = match handle {
+        Ok(h) => h,
+        Err(_) => return false,
+    };
+
+    let mut token = Default::default();
+    if unsafe { OpenProcessToken(handle, TOKEN_QUERY, &mut token) }.is_err() {
+        let _ = unsafe { CloseHandle(handle) };
+        return false;
+    }
+
+    let mut elevation = TOKEN_ELEVATION::default();
+    let mut ret_len = 0u32;
+    let result = unsafe {
+        GetTokenInformation(
+            token,
+            TokenElevation,
+            Some(&mut elevation as *mut TOKEN_ELEVATION as *mut std::ffi::c_void),
+            std::mem::size_of::<TOKEN_ELEVATION>() as u32,
+            &mut ret_len,
+        )
+    };
+
+    let _ = unsafe { CloseHandle(token) };
+    let _ = unsafe { CloseHandle(handle) };
+
+    result.is_ok() && elevation.TokenIsElevated != 0
 }
 
 fn detect_arch(pid: u32) -> String {

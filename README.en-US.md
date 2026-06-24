@@ -132,6 +132,8 @@ OpenSpeedy adjusts game speed by hooking the following Windows system time funct
 | QueryPerformanceCounter | kernel32.dll | High-resolution performance counter |
 | GetSystemTimeAsFileTime | kernel32.dll | Retrieves system time |
 | GetSystemTimePreciseAsFileTime | kernel32.dll | Retrieves high-precision system time |
+| SetWaitableTimer | kernel32.dll | Sets a waitable timer |
+| SetWaitableTimerEx | kernel32.dll | Sets a waitable timer (extended) |
 
 # ⚠️ Warnings
 - This tool is for educational and research purposes only
@@ -152,7 +154,9 @@ OpenSpeedy is licensed under the GPL v3 license.
 # 🙏 Acknowledgments
 OpenSpeedy uses source code from the following projects. Thanks to the open-source community! If OpenSpeedy helps you, a Star is welcome!
 - [minhook](https://github.com/TsudaKageyu/minhook): For API hooking
-- [tauri](https://tauri.app/): GUI
+- [tauri](https://tauri.app/): GUI framework
+- [MUI](https://mui.com/): UI component library
+- [Ant Design](https://ant.design/): UI splitter component
 
 Disclaimer: OpenSpeedy is intended for educational and research purposes only. Users assume all risks and liabilities associated with the use of this software. The author is not responsible for any loss or legal liability arising from the use of this software.
 

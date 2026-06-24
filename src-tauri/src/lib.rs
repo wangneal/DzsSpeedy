@@ -3,6 +3,7 @@ mod process_enumerator;
 mod system_stats;
 
 use process_enumerator::ProcessInfo;
+use process_enumerator::ModuleInfo;
 use std::process::Child;
 use std::sync::Mutex;
 
@@ -60,6 +61,11 @@ async fn get_process_list() -> Vec<ProcessInfo> {
 #[tauri::command(async)]
 async fn get_process_icon(pid: u32) -> Option<String> {
     process_enumerator::get_process_icon(pid)
+}
+
+#[tauri::command(async)]
+async fn get_process_modules(pid: u32) -> Vec<ModuleInfo> {
+    process_enumerator::enumerate_modules(pid)
 }
 
 #[tauri::command(async)]
@@ -138,6 +144,7 @@ pub fn run() {
             get_process_list,
             get_process_list_fast,
             get_process_icon,
+            get_process_modules,
             bridge64_health,
             bridge32_health,
             bridge_set_speed,

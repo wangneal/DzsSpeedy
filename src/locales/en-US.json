@@ -29,11 +29,37 @@
     "search": "Search by name, PID, or window title…",
     "pid": "PID",
     "name": "Process Name",
+    "admin": "Elevated",
     "arch": "Arch",
     "memory": "Memory",
     "enable": "Speed",
     "loading": "Loading processes…",
-    "noResults": "No matching processes"
+    "noResults": "No matching processes",
+    "detail": {
+      "title": "Process Detail",
+      "pid": "Process ID",
+      "name": "Process Name",
+      "arch": "Architecture",
+      "windowTitle": "Window Title",
+      "memory": "Memory Usage",
+      "exePath": "Executable Path",
+      "admin": "Administrator",
+      "speedStatus": "Speed Status",
+      "injected": "Injection",
+      "statusInjected": "Injected",
+      "statusEnabled": "Speed Enabled",
+      "statusDisabled": "Speed Disabled",
+      "statusNotInjected": "Not Injected",
+      "noSelection": "Select a process from the list to view details",
+      "yes": "Yes",
+      "no": "No",
+      "modules": "Loaded Modules",
+      "moduleName": "Module Name",
+      "modulePath": "Path",
+      "moduleBase": "Base Address",
+      "moduleSize": "Size",
+      "modulesCount": "{{count}} modules"
+    }
   },
   "shortcut": {
     "notSet": "Not set"

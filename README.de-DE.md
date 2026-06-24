@@ -132,6 +132,8 @@ OpenSpeedy passt die Spielgeschwindigkeit durch Hooking der folgenden Windows-Ze
 | QueryPerformanceCounter | kernel32.dll | Hochauflösender Leistungszähler |
 | GetSystemTimeAsFileTime | kernel32.dll | Ruft die Systemzeit ab |
 | GetSystemTimePreciseAsFileTime | kernel32.dll | Ruft die hochpräzise Systemzeit ab |
+| SetWaitableTimer | kernel32.dll | Setzt einen wartbaren Timer |
+| SetWaitableTimerEx | kernel32.dll | Setzt einen wartbaren Timer (erweitert) |
 
 # ⚠️ Warnhinweise
 - Dieses Tool ist ausschließlich für Bildungs- und Forschungszwecke bestimmt
@@ -153,6 +155,8 @@ OpenSpeedy ist unter der GPL v3 Lizenz lizenziert.
 OpenSpeedy verwendet Quellcode aus den folgenden Projekten. Dank an die Open-Source-Community! Wenn OpenSpeedy Ihnen hilft, geben Sie uns gerne einen Star!
 - [minhook](https://github.com/TsudaKageyu/minhook): Für API-Hooking
 - [tauri](https://tauri.app/): GUI
+- [MUI](https://mui.com/): UI-Komponentenbibliothek
+- [Ant Design](https://ant.design/): UI-Splitter-Komponente
 
 Haftungsausschluss: OpenSpeedy ist ausschließlich für Bildungs- und Forschungszwecke bestimmt. Die Nutzer übernehmen alle Risiken und Haftungen im Zusammenhang mit der Nutzung dieser Software. Der Autor ist nicht verantwortlich für Verluste oder rechtliche Haftung, die sich aus der Nutzung dieser Software ergeben.
 

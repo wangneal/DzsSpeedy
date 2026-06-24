@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useInterval } from "ahooks";
+import { Splitter } from "antd";
 import {
   Box, Paper, Typography, Avatar, Switch, TextField,
   Divider, Table, TableCell, TableHead, TableRow,
@@ -11,7 +12,8 @@ import WindowIcon from "@mui/icons-material/Window";
 import SearchIcon from "@mui/icons-material/Search";
 import MemoryIcon from "@mui/icons-material/Memory";
 import SpeedPanel from "./SpeedPanel";
-import { useSpeed } from "../hooks/useSettings";
+import ProcessDetail from "./ProcessDetail";
+import { useSettings, useSpeed } from "../hooks/useSettings";
 
 // ── Types & constants ────────────────────────────────────────────────────
 
@@ -22,17 +24,11 @@ interface ProcessInfo {
   window_title: string | null;
   memory_kb: number;
   exe_path: string | null;
+  admin: boolean;
 }
 
 const ROW_H = 42;
-const COL = { pid: 72, arch: 64, mem: 90, check: 60 } as const;
-
-function fmtMem(kb: number): string {
-  if (kb >= 1024 * 1024) return `${(kb / (1024 * 1024)).toFixed(1)} GB`;
-  if (kb >= 1024) return `${(kb / 1024).toFixed(0)} MB`;
-  if (kb > 0) return `${kb} KB`;
-  return "—";
-}
+const COL = { pid: 72, check: 60 } as const;
 
 function ProcessIcon({ pid, icons }: { pid: number; icons: Record<number, string> }) {
   const src = icons[pid];
@@ -47,18 +43,23 @@ function ProcessIcon({ pid, icons }: { pid: number; icons: Record<number, string
 // ── Memoized process table (isolated from speed state) ───────────────────
 
 const ProcessRow = React.memo(function ProcessRow({
-  p, on, icons, start, onToggle,
+  p, on, icons, start, selected, onToggle, onSelect,
 }: {
-  p: ProcessInfo; on: boolean; icons: Record<number, string>; start: number;
+  p: ProcessInfo; on: boolean; icons: Record<number, string>; start: number; selected: boolean;
   onToggle: (pid: number, arch: string) => void;
+  onSelect: (pid: number) => void;
 }) {
   return (
-    <Box sx={{
-      display: "grid", gridTemplateColumns: `${COL.pid}px 1fr ${COL.arch}px ${COL.mem}px ${COL.check}px`,
-      position: "absolute", top: 0, left: 0, right: 0, height: ROW_H, transform: `translateY(${start}px)`,
-      alignItems: "center", borderBottom: 1, borderColor: "divider",
-      bgcolor: on ? "action.selected" : "transparent", "&:hover": { bgcolor: on ? "action.selected" : "action.hover" },
-    }}>
+    <Box
+      onClick={() => onSelect(p.pid)}
+      sx={{
+        display: "grid", gridTemplateColumns: `${COL.pid}px 1fr ${COL.check}px`,
+        position: "absolute", top: 0, left: 0, right: 0, height: ROW_H, transform: `translateY(${start}px)`,
+        alignItems: "center", borderBottom: 1, borderColor: "divider", cursor: "pointer",
+        bgcolor: selected ? "rgba(92,107,192,0.12)" : on ? "action.selected" : "transparent",
+        "&:hover": { bgcolor: selected ? "rgba(92,107,192,0.18)" : on ? "action.selected" : "action.hover" },
+      }}
+    >
       <Typography variant="body2" color="text.secondary">{p.pid}</Typography>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, minWidth: 0 }}>
         <ProcessIcon pid={p.pid} icons={icons} />
@@ -67,19 +68,15 @@ const ProcessRow = React.memo(function ProcessRow({
           {p.window_title && <Typography variant="caption" noWrap sx={{ color: "text.disabled", display: "block", lineHeight: 1.2 }}>{p.window_title}</Typography>}
         </Box>
       </Box>
-      <Box sx={{ textAlign: "center" }}>
-        <Typography variant="caption" component="span" sx={{ fontWeight: 600, px: 0.8, py: 0.2, borderRadius: 0.5, fontSize: "0.7rem", bgcolor: p.arch === "x86" ? "warning.main" : "secondary.main", color: "#fff" }}>{p.arch}</Typography>
-      </Box>
-      <Typography variant="body2" sx={{ textAlign: "right" }}>{fmtMem(p.memory_kb)}</Typography>
       <Box sx={{ textAlign: "center" }}><Switch size="small" checked={on} onChange={() => onToggle(p.pid, p.arch)} /></Box>
     </Box>
   );
 }, (prev, next) =>
-  prev.p.pid === next.p.pid && prev.on === next.on && prev.start === next.start
+  prev.p.pid === next.p.pid && prev.on === next.on && prev.start === next.start && prev.selected === next.selected
 );
 
 const ProcessTable = function ProcessTable({
-  processes, filtered, search, onSearch, icons, enabled, onToggle,
+  processes, filtered, search, onSearch, icons, enabled, selectedPid, onToggle, onSelect,
 }: {
   processes: ProcessInfo[];
   filtered: ProcessInfo[];
@@ -87,14 +84,16 @@ const ProcessTable = function ProcessTable({
   onSearch: (v: string) => void;
   icons: Record<number, string>;
   enabled: Set<number>;
+  selectedPid: number | null;
   onToggle: (pid: number, arch: string) => void;
+  onSelect: (pid: number) => void;
 }) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const vz = useVirtualizer({ count: filtered.length, getScrollElement: () => scrollRef.current!, estimateSize: () => ROW_H, overscan: 12 });
 
   return (
-    <Paper elevation={0} sx={{ mx: 1.5, mt: 1.5, flex: 1, bgcolor: "background.paper", border: 1, borderColor: "divider", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Paper elevation={0} sx={{ height: "100%", bgcolor: "background.paper", border: 1, borderColor: "divider", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: "flex", alignItems: "center" }}>
         <MemoryIcon sx={{ color: "primary.main", fontSize: 18, mr: 1 }} />
         <Typography variant="caption" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "text.secondary" }}>{t("process.title")}</Typography>
@@ -108,16 +107,16 @@ const ProcessTable = function ProcessTable({
 
       <Box sx={{ px: 2, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <Table size="small" sx={{ tableLayout: "fixed", flexShrink: 0 }}>
-          <colgroup><col width={COL.pid} /><col /><col width={COL.arch} /><col width={COL.mem} /><col width={COL.check} /></colgroup>
+          <colgroup><col width={COL.pid} /><col /><col width={COL.check} /></colgroup>
           <TableHead><TableRow>
-            <TableCell>{t("process.pid")}</TableCell><TableCell>{t("process.name")}</TableCell><TableCell align="center">{t("process.arch")}</TableCell><TableCell align="right">{t("process.memory")}</TableCell><TableCell align="center">{t("process.enable")}</TableCell>
+            <TableCell>{t("process.pid")}</TableCell><TableCell>{t("process.name")}</TableCell><TableCell align="center">{t("process.enable")}</TableCell>
           </TableRow></TableHead>
         </Table>
 
-        <Box ref={scrollRef} sx={{ height: "calc(100vh - 48px - 320px)", overflow: "auto", position: "relative" }}>
+        <Box ref={scrollRef} sx={{ flex: 1, overflow: "auto", position: "relative" }}>
           <div style={{ height: vz.getTotalSize(), width: 1 }} />
           {vz.getVirtualItems().map(vr => (
-            <ProcessRow key={filtered[vr.index].pid} p={filtered[vr.index]} on={enabled.has(filtered[vr.index].pid)} icons={icons} start={vr.start} onToggle={onToggle} />
+            <ProcessRow key={filtered[vr.index].pid} p={filtered[vr.index]} on={enabled.has(filtered[vr.index].pid)} icons={icons} start={vr.start} selected={selectedPid === filtered[vr.index].pid} onToggle={onToggle} onSelect={onSelect} />
           ))}
           {filtered.length === 0 && (
             <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
@@ -144,7 +143,14 @@ export default function ProcessManager() {
   const [search, setSearch] = useState("");
   const [icons, setIcons] = useState<Record<number, string>>({});
   const [speedMap, setSpeedMap] = useState<Map<number, SpeedState>>(new Map());
+  const [selectedPid, setSelectedPid] = useState<number | null>(null);
+  const { settings } = useSettings();
   const { speed, setSpeed, commitSpeed } = useSpeed();
+
+  const gears = useMemo(() => settings
+    ? [1, 2, 3, 4, 5].map(i => (settings[`gear${i}Speed` as keyof typeof settings] as number) || 1)
+    : [1, 2, 5, 10, 100],
+  [settings]);
 
   // Derive enabled set for UI
   const enabled = useMemo(() => {
@@ -197,13 +203,28 @@ export default function ProcessManager() {
     for (let w = 0; w < CONCURRENCY; w++) worker();
   }, [processes]);
 
+  const selectedProcess = useMemo(() =>
+    selectedPid ? processes.find(p => p.pid === selectedPid) ?? null : null,
+  [processes, selectedPid]);
+  const selectedSpeedState = selectedPid ? speedMap.get(selectedPid) : undefined;
+
   return (
     <Box sx={{ height: "calc(100vh - 48px)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <SpeedPanel speed={speed} onChange={setSpeed} onCommit={commitSpeed} />
-      <ProcessTable
-        processes={processes} filtered={filtered} search={search} onSearch={setSearch}
-        icons={icons} enabled={enabled} onToggle={toggle}
-      />
+      <SpeedPanel speed={speed} gears={gears} onChange={setSpeed} onCommit={commitSpeed} />
+      <Box sx={{ flex: 1, m: 1.5, overflow: "hidden" }}>
+        <Splitter style={{ height: "100%" }}>
+          <Splitter.Panel defaultSize="60%" min="300px">
+            <ProcessTable
+              processes={processes} filtered={filtered} search={search} onSearch={setSearch}
+              icons={icons} enabled={enabled} selectedPid={selectedPid}
+              onToggle={toggle} onSelect={setSelectedPid}
+            />
+          </Splitter.Panel>
+          <Splitter.Panel min="250px">
+            <ProcessDetail process={selectedProcess} speedState={selectedSpeedState} icons={icons} />
+          </Splitter.Panel>
+        </Splitter>
+      </Box>
     </Box>
   );
 }

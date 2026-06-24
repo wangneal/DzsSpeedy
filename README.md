@@ -133,6 +133,8 @@ OpenSpeedy 通过 Hook 以下 Windows 系统时间函数来实现游戏速度调
 |QueryPerformanceCounter |	kernel32.dll	| 高精度性能计数器 |
 |GetSystemTimeAsFileTime |	kernel32.dll	| 获取系统时间 |
 |GetSystemTimePreciseAsFileTime |	kernel32.dll	| 获取高精度系统时间 |
+|SetWaitableTimer |	kernel32.dll	| 设置可等待定时器 |
+|SetWaitableTimerEx |	kernel32.dll	| 设置可等待定时器(扩展) |
 
 # ⚠️ 注意事项
 - 本工具仅供学习和研究使用
@@ -154,6 +156,8 @@ OpenSpeedy 遵循 GPL v3 许可证。
 OpenSpeedy使用到以下项目的源码，感谢开源社区的力量，如果OpenSpeedy对你有帮助，欢迎Star!
 - [minhook](https://github.com/TsudaKageyu/minhook): 用于API Hook
 - [tauri](https://tauri.app/): GUI
+- [MUI](https://mui.com/): UI 组件库
+- [Ant Design](https://ant.design/): UI 分割面板组件
 
 免责声明: OpenSpeedy 仅用于教育和研究目的。用户应自行承担使用本软件的所有风险和责任。作者不对因使用本软件导致的任何损失或法律责任负责。
 

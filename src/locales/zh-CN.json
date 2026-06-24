@@ -29,11 +29,37 @@
     "search": "搜索进程名、PID 或窗口标题…",
     "pid": "PID",
     "name": "进程名称",
+    "admin": "权限",
     "arch": "架构",
     "memory": "内存",
     "enable": "加速",
     "loading": "正在加载进程列表…",
-    "noResults": "无匹配进程"
+    "noResults": "无匹配进程",
+    "detail": {
+      "title": "进程详情",
+      "pid": "进程 ID",
+      "name": "进程名称",
+      "arch": "架构",
+      "windowTitle": "窗口标题",
+      "memory": "内存占用",
+      "exePath": "可执行路径",
+      "admin": "管理员权限",
+      "speedStatus": "加速状态",
+      "injected": "注入状态",
+      "statusInjected": "已注入",
+      "statusEnabled": "加速已启用",
+      "statusDisabled": "加速已禁用",
+      "statusNotInjected": "未注入",
+      "noSelection": "请在左侧列表中选择一个进程查看详情",
+      "yes": "是",
+      "no": "否",
+      "modules": "已加载模块",
+      "moduleName": "模块名称",
+      "modulePath": "路径",
+      "moduleBase": "基址",
+      "moduleSize": "大小",
+      "modulesCount": "{{count}} 个模块"
+    }
   },
   "shortcut": {
     "notSet": "未设置"

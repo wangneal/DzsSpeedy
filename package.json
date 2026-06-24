@@ -1,7 +1,7 @@
 {
   "name": "openspeedy",
   "private": true,
-  "version": "3.1.1",
+  "version": "3.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,6 +25,7 @@
     "@tauri-apps/plugin-store": "^2.4.3",
     "@tauri-apps/plugin-window": "^2.0.0-alpha.1",
     "ahooks": "^3.9.7",
+    "antd": "^6.4.5",
     "i18next": "^26.3.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
