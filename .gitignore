@@ -18,6 +18,10 @@ dist-ssr
 # Tauri generated
 src-tauri/gen/
 
+# Auto-copied dev/release binaries (build.rs writes them from target/)
+# CI regenerates them; never commit local builds.
+src-tauri/binaries/
+
 # Claude
 .claude/
 
