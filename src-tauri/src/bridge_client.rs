@@ -8,6 +8,8 @@ use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 
+use windows::Win32::System::Pipes::{SetNamedPipeHandleState, NAMED_PIPE_MODE, PIPE_READMODE_MESSAGE};
+
 const PIPE_64: &str = r"\\.\pipe\OpenSpeedyBridge64";
 const PIPE_32: &str = r"\\.\pipe\OpenSpeedyBridge32";
 
@@ -17,21 +19,28 @@ fn to_wide(s: &str) -> Vec<u16> {
 
 fn open_pipe(name: &str) -> Option<HANDLE> {
     let name = to_wide(name);
-    let h = unsafe {
-        CreateFileW(
-            PCWSTR::from_raw(name.as_ptr()),
-            0xC0000000 | 0x40000000, // GENERIC_READ | GENERIC_WRITE
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            None,
-            OPEN_EXISTING,
-            Default::default(),
-            None,
-        )
-    };
-    match h {
-        Ok(h) if h != INVALID_HANDLE_VALUE => Some(h),
-        _ => None,
+    for _ in 0..40 {
+        let h = unsafe {
+            CreateFileW(
+                PCWSTR::from_raw(name.as_ptr()),
+                0xC0000000 | 0x40000000, // GENERIC_READ | GENERIC_WRITE
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                None,
+                OPEN_EXISTING,
+                Default::default(),
+                None,
+            )
+        };
+        if let Ok(h) = h {
+            if h != INVALID_HANDLE_VALUE {
+                let mut mode = NAMED_PIPE_MODE(PIPE_READMODE_MESSAGE.0);
+                let _ = unsafe { SetNamedPipeHandleState(h, Some(&mut mode), None, None) };
+                return Some(h);
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    None
 }
 
 fn pipe_command(pipe: &str, cmd: &str) -> Option<String> {
@@ -40,18 +49,36 @@ fn pipe_command(pipe: &str, cmd: &str) -> Option<String> {
     let mut written = 0u32;
     let _ = unsafe { WriteFile(h, Some(msg.as_bytes()), Some(&mut written), None) };
 
-    let mut buf = [0u8; 256];
+    let mut buf = [0u8; 4096];
     let mut nread = 0u32;
     let ok = unsafe { ReadFile(h, Some(&mut buf), Some(&mut nread), None) };
     unsafe { let _ = CloseHandle(h); }
 
     if ok.is_err() || nread == 0 {
-        eprintln!("[bridge] {cmd} → pipe read failed (err={:?}, nread={nread})", ok.err());
+        let line = format!("[bridge] {cmd} → pipe read failed (err={:?}, nread={nread})", ok.err());
+        eprintln!("{}", line);
+        frontend_log(&line);
         return None;
     }
     let resp = String::from_utf8_lossy(&buf[..nread as usize]).trim().to_string();
-    eprintln!("[bridge] {cmd} → {resp}");
+    let line = format!("[bridge] {cmd} → {resp}");
+    eprintln!("{}", line);
+    frontend_log(&line);
     Some(resp)
+}
+
+/// 追加写诊断日志到 %TEMP%\openspeedy-frontend.log
+/// 让 release 模式也能取证。
+fn frontend_log(msg: &str) {
+    use std::io::Write;
+    let path = std::env::temp_dir().join("openspeedy-frontend.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+        let _ = writeln!(f, "[{}.{:03}] [pid={}] {}",
+            now.as_secs(), now.subsec_millis(), std::process::id(), msg);
+        let _ = f.flush();
+    }
 }
 
 /// Check if bridge64 is running and responsive.

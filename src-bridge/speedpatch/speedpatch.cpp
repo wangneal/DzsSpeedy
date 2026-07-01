@@ -1,4 +1,4 @@
-/*
+﻿/*
  * OpenSpeedy - Open Source Game Speed Controller
  * Copyright (C) 2025 Game1024
  *
@@ -28,7 +28,7 @@
 #include <sstream>
 #pragma comment(lib, "winmm.lib")
 #pragma data_seg("shared")
-static std::atomic<double> factor = 1.0;
+static volatile double factor = 1.0;
 #pragma data_seg()
 #pragma comment(linker, "/section:shared,RWS")
 
@@ -36,6 +36,64 @@ static std::shared_mutex mutex;
 static std::atomic<double> pre_factor = 1.0;
 static HANDLE hFileMap;
 static bool*  pEnabled;
+
+// ── 诊断日志 ──────────────────────────────────────────────────────────────
+// 写入 DebugView (https://learn.microsoft.com/sysinternals/downloads/debugview)
+// 必须在 Release 构建时也能输出，因此用 OutputDebugStringW 而不是 OutputDebugStringA
+// 用前缀 [OpenSpeedySpeedpatch] 方便过滤
+static void SP_DbgLog(const wchar_t* fmt, ...)
+{
+    wchar_t buf[1024];
+    wchar_t prefix[] = L"[OpenSpeedySpeedpatch][pid=";
+    // 把 pid 与 msg 拼到 buf
+    int n = 0;
+    n += wsprintfW(buf, L"%s%lu]", prefix, GetCurrentProcessId());
+    va_list ap;
+    va_start(ap, fmt);
+    n += _vsnwprintf_s(buf + n, _countof(buf) - n, _TRUNCATE, fmt, ap);
+    va_end(ap);
+    // 同时输出到 OutputDebugString 与文件（写文件跨进程也能取证）
+    OutputDebugStringW(buf);
+
+    // 写文件: %TEMP%\openspeedy-speedpatch-<pid>.log
+    wchar_t tmpPath[MAX_PATH];
+    DWORD len = GetTempPathW(_countof(tmpPath), tmpPath);
+    if (len > 0 && len < _countof(tmpPath))
+    {
+        wchar_t filePath[MAX_PATH];
+        _snwprintf_s(filePath, _countof(filePath), _TRUNCATE,
+                     L"%sopenspeedy-speedpatch-%lu.log", tmpPath, GetCurrentProcessId());
+        HANDLE hf = CreateFileW(filePath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (hf != INVALID_HANDLE_VALUE)
+        {
+            DWORD wrote = 0;
+            // 补换行（snwprintf 不会自动加）
+            if (n < (int)_countof(buf) - 1) { buf[n++] = L'\n'; buf[n] = L'\0'; }
+            WriteFile(hf, buf, (DWORD)(n * sizeof(wchar_t)), &wrote, nullptr);
+            CloseHandle(hf);
+        }
+    }
+}
+
+static const wchar_t* SP_MhStatusName(MH_STATUS s)
+{
+    switch (s)
+    {
+        case MH_OK:                       return L"MH_OK";
+        case MH_ERROR_ALREADY_INITIALIZED:return L"MH_ERROR_ALREADY_INITIALIZED";
+        case MH_ERROR_NOT_INITIALIZED:    return L"MH_ERROR_NOT_INITIALIZED";
+        case MH_ERROR_ALREADY_CREATED:    return L"MH_ERROR_ALREADY_CREATED";
+        case MH_ERROR_NOT_CREATED:        return L"MH_ERROR_NOT_CREATED";
+        case MH_ERROR_ENABLED:            return L"MH_ERROR_ENABLED";
+        case MH_ERROR_DISABLED:           return L"MH_ERROR_DISABLED";
+        case MH_ERROR_NOT_EXECUTABLE:     return L"MH_ERROR_NOT_EXECUTABLE";
+        case MH_ERROR_UNSUPPORTED_FUNCTION:return L"MH_ERROR_UNSUPPORTED_FUNCTION";
+        case MH_ERROR_MEMORY_ALLOC:       return L"MH_ERROR_MEMORY_ALLOC";
+        case MH_ERROR_FUNCTION_NOT_FOUND: return L"MH_ERROR_FUNCTION_NOT_FOUND";
+        default:                          return L"MH_STATUS_UNKNOWN";
+    }
+}
 
 typedef VOID (WINAPI* SLEEP) (DWORD);
 typedef DWORD (WINAPI* SLEEPEX) (DWORD, BOOL);
@@ -114,21 +172,31 @@ static SETWAITABLETIMEREX realSetWaitableTimerEx = NULL;
 
 SPEEDPATCH_API void SP_SetSpeed(double factor_)
 {
-    factor.store(factor_);
+    factor = factor_;
 }
 
 SPEEDPATCH_API double SP_GetSpeed()
 {
-    return factor.load();
+    return factor;
 }
 
 void SP_Install()
 {
     DWORD processId = GetCurrentProcessId();
     std::wstring filemapName = GetProcessFileMapName(processId);
+    SP_DbgLog(L"SP_Install: enter, filemap=%s", filemapName.c_str());
+
+    SECURITY_DESCRIPTOR sd;
+    InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
+    SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = &sd;
+    sa.bInheritHandle = FALSE;
+
     hFileMap = CreateFileMapping(
         INVALID_HANDLE_VALUE,
-        NULL,
+        &sa,
         PAGE_READWRITE,
         0,
         sizeof (bool),
@@ -136,6 +204,9 @@ void SP_Install()
         );
     if (hFileMap == NULL)
     {
+        DWORD err = GetLastError();
+        SP_DbgLog(L"SP_Install: CreateFileMapping FAILED err=%lu (0x%08lx) name=%s",
+                  err, err, filemapName.c_str());
         return;
     }
     pEnabled = (bool*) MapViewOfFile(
@@ -147,11 +218,14 @@ void SP_Install()
         );
     if (pEnabled == NULL)
     {
+        DWORD err = GetLastError();
+        SP_DbgLog(L"SP_Install: MapViewOfFile FAILED err=%lu (0x%08lx)", err, err);
         CloseHandle(hFileMap);
         hFileMap = NULL;
         return;
     }
     *pEnabled = true;
+    SP_DbgLog(L"SP_Install: OK, hFileMap=%p pEnabled=%p", hFileMap, (void*)pEnabled);
 }
 
 void SP_Uninstall()
@@ -271,7 +345,7 @@ double SpeedFactor()
 {
     if (SP_IsEnabled())
     {
-        return factor.load();
+        return factor;
     }
     else
     {
@@ -638,17 +712,19 @@ inline VOID shouldUpdateAll()
 template <typename S, typename T>
 inline VOID MH_HOOK(S* pTarget, S* pDetour, T** ppOriginal)
 {
-
-    if (MH_CreateHook(reinterpret_cast<LPVOID> (pTarget),
-                      reinterpret_cast<LPVOID> (pDetour),
-                      reinterpret_cast<LPVOID*> (ppOriginal)) != MH_OK)
+    MH_STATUS s1 = MH_CreateHook(reinterpret_cast<LPVOID> (pTarget),
+                                 reinterpret_cast<LPVOID> (pDetour),
+                                 reinterpret_cast<LPVOID*> (ppOriginal));
+    if (s1 != MH_OK)
     {
-        MessageBoxW(NULL, L"MH装载失败", L"DLL", MB_OK);
+        SP_DbgLog(L"MH_CreateHook target=%p FAILED status=%s",
+                  (void*)pTarget, SP_MhStatusName(s1));
     }
-
-    if (MH_EnableHook(reinterpret_cast<LPVOID> (pTarget)) != MH_OK)
+    MH_STATUS s2 = MH_EnableHook(reinterpret_cast<LPVOID> (pTarget));
+    if (s2 != MH_OK)
     {
-        MessageBoxW(NULL, L"MH装载失败", L"DLL", MB_OK);
+        SP_DbgLog(L"MH_EnableHook target=%p FAILED status=%s",
+                  (void*)pTarget, SP_MhStatusName(s2));
     }
 }
 
@@ -667,10 +743,19 @@ BOOL APIENTRY DllMain(HMODULE hModule,
     {
     case DLL_PROCESS_ATTACH:
 
-        if (MH_Initialize() != MH_OK)
+        SP_DbgLog(L"DllMain: DLL_PROCESS_ATTACH, hModule=%p", (void*)hModule);
         {
-            MessageBoxW(NULL, L"MH装载失败", L"DLL", MB_OK);
-            return FALSE;
+            MH_STATUS status = MH_Initialize();
+            SP_DbgLog(L"DllMain: MH_Initialize status=%s", SP_MhStatusName(status));
+            if (status != MH_OK && status != MH_ERROR_ALREADY_INITIALIZED)
+            {
+                // 不再 return FALSE 让 Windows 卸载 DLL — 否则主程序侧完全没有线索
+                // 创建 FileMapping 后 return FALSE，main 端能从 STATUS 看到 "loaded but unhealthy"
+                SP_DbgLog(L"DllMain: MH_Initialize fatal — still creating FileMapping for diagnostics");
+                SP_Install();
+                SP_DbgLog(L"DllMain: ABORT after SP_Install (MH_Initialize fatal)");
+                return FALSE;
+            }
         }
         SP_Install();
         /* Initial timeGetTime */
@@ -761,6 +846,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
                 reinterpret_cast<LPVOID*> (
                     &realGetSystemTimePreciseAsFileTime));
 
+        SP_DbgLog(L"DllMain: all hooks installed");
 
         break;
     case DLL_THREAD_ATTACH:
@@ -793,7 +879,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
             std::unique_lock<std::shared_mutex> lock(mutex);
             if (MH_Uninitialize() != MH_OK)
             {
-                MessageBoxW(NULL, L"DLL卸载失败", L"DLL", MB_OK);
                 return FALSE;
             }
         }

@@ -225,7 +225,46 @@ export default function ProcessManager() {
   [processes, selectedPid]);
   const selectedSpeedState = selectedPid ? speedMap.get(selectedPid) : undefined;
 
-  // Query real injection status from bridge when selecting a process
+  // Query real injection status from bridge periodically for all tracked processes
+  useInterval(async () => {
+    if (speedMap.size === 0) return;
+    const nextMap = new Map(speedMap);
+    let changed = false;
+
+    for (const [pid, st] of speedMap) {
+      try {
+        const status = await invoke<boolean | null>("bridge_get_status", { pid, arch: st.arch });
+        if (status === true) {
+          if (!st.injected || !st.enabled) {
+            nextMap.set(pid, { injected: true, enabled: true, arch: st.arch });
+            changed = true;
+          }
+        } else if (status === false) {
+          if (!st.injected || st.enabled) {
+            nextMap.set(pid, { injected: true, enabled: false, arch: st.arch });
+            changed = true;
+          }
+        } else {
+          // Not injected (status === null) or offline — if we previously thought it was injected, clean up state
+          if (st.injected) {
+            nextMap.delete(pid);
+            changed = true;
+          }
+        }
+      } catch {
+        // If query fails, assume offline / not injected
+        if (st.injected) {
+          nextMap.delete(pid);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      setSpeedMap(nextMap);
+    }
+  }, 2000);
+
+  // Instantly query status when selecting a new process
   useEffect(() => {
     const p = selectedProcess;
     if (!p) return;
@@ -235,8 +274,15 @@ export default function ProcessManager() {
           setSpeedMap(prev => { const n = new Map(prev); n.set(p.pid, { injected: true, enabled: true, arch: p.arch }); return n; });
         } else if (status === false) {
           setSpeedMap(prev => { const n = new Map(prev); n.set(p.pid, { injected: true, enabled: false, arch: p.arch }); return n; });
+        } else {
+          // If bridge tells us it is not injected, clear any stale state
+          setSpeedMap(prev => {
+            if (!prev.has(p.pid)) return prev;
+            const n = new Map(prev);
+            n.delete(p.pid);
+            return n;
+          });
         }
-        // status === null means not injected — don't set anything
       })
       .catch(() => {});
   }, [selectedPid]);

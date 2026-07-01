@@ -98,9 +98,9 @@ async fn get_system_stats() -> system_stats::SystemStats {
 #[tauri::command(async)]
 async fn bridge_inject(pid: u32, arch: String) -> bool {
     if arch == "x86" {
-        bridge_client::bridge32_inject(pid) && bridge_client::bridge32_enable(pid)
+        bridge_client::bridge32_inject(pid)
     } else {
-        bridge_client::bridge64_inject(pid) && bridge_client::bridge64_enable(pid)
+        bridge_client::bridge64_inject(pid)
     }
 }
 
