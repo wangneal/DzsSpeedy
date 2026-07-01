@@ -1,8 +1,8 @@
-﻿//! OpenSpeedy Bridge — named-pipe server (Rust).
+﻿//! DzsSpeedy Bridge — named-pipe server (Rust).
 
 //!
 
-//! Receives text commands from the main OpenSpeedy process:
+//! Receives text commands from the main DzsSpeedy process:
 
 //!   INJECT <pid>  EJECT <pid>  ENABLE <pid>  DISABLE <pid>
 

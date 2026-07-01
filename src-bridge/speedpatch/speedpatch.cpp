@@ -1,6 +1,6 @@
 ﻿/*
  * DzsSpeedy (斗战神游戏加速器) — Windows 时间感知加速控制器
- * Copyright (C) 2025 Game1024
+ * Copyright (C) 2026 wangneal
  *
  * This program is free software: you can redistribute it
  * and/or modify it under the terms of the GNU General
@@ -40,7 +40,7 @@ static bool*  pEnabled;
 // ── 诊断日志 ──────────────────────────────────────────────────────────────
 // 写入 DebugView (https://learn.microsoft.com/sysinternals/downloads/debugview)
 // 必须在 Release 构建时也能输出，因此用 OutputDebugStringW 而不是 OutputDebugStringA
-// 用前缀 [OpenSpeedySpeedpatch] 方便过滤
+// 用前缀 [DzsSpeedy] 方便过滤
 static void SP_DbgLog(const wchar_t* fmt, ...)
 {
     wchar_t buf[1024];
@@ -55,14 +55,14 @@ static void SP_DbgLog(const wchar_t* fmt, ...)
     // 同时输出到 OutputDebugString 与文件（写文件跨进程也能取证）
     OutputDebugStringW(buf);
 
-    // 写文件: %TEMP%\openspeedy-speedpatch-<pid>.log
+    // 写文件: %TEMP%\dzsspeedy-speedpatch-<pid>.log
     wchar_t tmpPath[MAX_PATH];
     DWORD len = GetTempPathW(_countof(tmpPath), tmpPath);
     if (len > 0 && len < _countof(tmpPath))
     {
         wchar_t filePath[MAX_PATH];
         _snwprintf_s(filePath, _countof(filePath), _TRUNCATE,
-                     L"%sopenspeedy-speedpatch-%lu.log", tmpPath, GetCurrentProcessId());
+                     L"%sdzsspeedy-speedpatch-%lu.log", tmpPath, GetCurrentProcessId());
         HANDLE hf = CreateFileW(filePath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (hf != INVALID_HANDLE_VALUE)

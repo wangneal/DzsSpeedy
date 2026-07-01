@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "mainBinaryName": "DzsSpeedy",
     "windows": [
       {
         "title": "斗战神游戏加速器",

@@ -55,16 +55,16 @@ jobs:
         id: upload-unsigned-msi
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSpeedy-${{ steps.version.outputs.version }}-msi-unsigned
+          name: DzsSpeedy-${{ steps.version.outputs.version }}-msi-unsigned
           path: src-tauri/target/release/bundle/msi/*.msi
 
       - name: Upload unsigned portable
         id: upload-unsigned-portable
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSpeedy-${{ steps.version.outputs.version }}-portable-unsigned
+          name: DzsSpeedy-${{ steps.version.outputs.version }}-portable-unsigned
           path: |
-            src-tauri/target/release/openspeedy.exe
+            src-tauri/target/release/DzsSpeedy.exe
             src-tauri/target/release/bridge32.exe
             src-tauri/target/release/bridge64.exe
             src-tauri/target/release/speedpatch32.dll
@@ -81,7 +81,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: '58b9835d-38ea-4898-a564-76610c01cecd'
-          project-slug: OpenSpeedy
+          project-slug: DzsSpeedy
           signing-policy-slug: release-signing
           github-artifact-id: ${{ needs.build.outputs.msi-artifact-id }}
           artifact-configuration-slug: msi
@@ -93,7 +93,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: '58b9835d-38ea-4898-a564-76610c01cecd'
-          project-slug: OpenSpeedy
+          project-slug: DzsSpeedy
           signing-policy-slug: release-signing
           github-artifact-id: ${{ needs.build.outputs.portable-artifact-id }}
           artifact-configuration-slug: zip
@@ -103,11 +103,11 @@ jobs:
       - name: Upload signed MSI
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSpeedy-${{ needs.build.outputs.version }}-msi-signed
+          name: DzsSpeedy-${{ needs.build.outputs.version }}-msi-signed
           path: signed-msi/
 
       - name: Upload signed portable
         uses: actions/upload-artifact@v4
         with:
-          name: OpenSpeedy-${{ needs.build.outputs.version }}-portable-signed
+          name: DzsSpeedy-${{ needs.build.outputs.version }}-portable-signed
           path: signed-portable/

@@ -67,7 +67,7 @@ fn pipe_command(pipe: &str, cmd: &str) -> Option<String> {
     Some(resp)
 }
 
-/// 追加写诊断日志到 %TEMP%\openspeedy-frontend.log
+/// 追加写诊断日志到 %TEMP%\dzsspeedy-frontend.log
 /// 让 release 模式也能取证。
 fn frontend_log(msg: &str) {
     use std::io::Write;

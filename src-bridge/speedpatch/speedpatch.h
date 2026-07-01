@@ -1,6 +1,7 @@
 /*
- * OpenSpeedy - Open Source Game Speed Controller
- * Copyright (C) 2025 Game1024
+ * DzsSpeedy (斗战神游戏加速器) — Windows 时间感知加速控制器
+ * Copyright (C) 2026 wangneal
+ * https://github.com/wangneal/DzsSpeedy
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
