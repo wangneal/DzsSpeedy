@@ -175,11 +175,11 @@ fn speedpatch_dll(is64: bool) -> &'static str {
 
 
 
-/// `OpenSpeedy.<pid>` — same name as speedpatch `GetProcessFileMapName`.
+/// `DzsSpeedy.<pid>` — same name as speedpatch `GetProcessFileMapName`.
 
 fn speedpatch_map_name(pid: u32) -> Vec<u16> {
 
-    to_wide(&format!("OpenSpeedy.{pid}"))
+    to_wide(&format!("DzsSpeedy.{pid}"))
 
 }
 
@@ -189,7 +189,7 @@ fn speedpatch_map_name(pid: u32) -> Vec<u16> {
 
 fn global_speed_map_name() -> Vec<u16> {
 
-    to_wide("OpenSpeedy.SpeedFactor")
+    to_wide("DzsSpeedy.SpeedFactor")
 
 }
 
@@ -219,7 +219,7 @@ fn write_global_speed_factor(factor: f64) -> Result<(), String> {
 
         )
 
-        .map_err(|e| format!("CreateFileMapping(OpenSpeedy.SpeedFactor): {e:?}"))?;
+        .map_err(|e| format!("CreateFileMapping(DzsSpeedy.SpeedFactor): {e:?}"))?;
 
         let view = MapViewOfFile(h, FILE_MAP_ALL_ACCESS, 0, 0, size);
 
@@ -227,7 +227,7 @@ fn write_global_speed_factor(factor: f64) -> Result<(), String> {
 
             let _ = CloseHandle(h);
 
-            return Err("MapViewOfFile(OpenSpeedy.SpeedFactor) failed".into());
+            return Err("MapViewOfFile(DzsSpeedy.SpeedFactor) failed".into());
 
         }
 
@@ -327,7 +327,7 @@ fn write_speedpatch_enabled(pid: u32, enabled: bool) -> Result<(), String> {
 
         let h = OpenFileMappingW(FILE_MAP_WRITE.0, false, PCWSTR::from_raw(name.as_ptr()))
 
-            .map_err(|e| format!("OpenFileMapping(OpenSpeedy.{pid}): {e:?}"))?;
+            .map_err(|e| format!("OpenFileMapping(DzsSpeedy.{pid}): {e:?}"))?;
 
         let view = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, std::mem::size_of::<bool>());
 
@@ -335,7 +335,7 @@ fn write_speedpatch_enabled(pid: u32, enabled: bool) -> Result<(), String> {
 
             let _ = CloseHandle(h);
 
-            return Err(format!("MapViewOfFile(OpenSpeedy.{pid}) failed"));
+            return Err(format!("MapViewOfFile(DzsSpeedy.{pid}) failed"));
 
         }
 
@@ -435,7 +435,7 @@ fn do_inject(pid: u32) -> Result<(), String> {
 
         if do_status(pid).is_none() {
 
-            dbg_log(&format!("do_inject pid={}: LoadLibraryW returned OK but FileMapping OpenSpeedy.{} not seen within 2s",
+            dbg_log(&format!("do_inject pid={}: LoadLibraryW returned OK but FileMapping DzsSpeedy.{} not seen within 2s",
                       pid, pid));
 
             detail.push_str("W:DLL loaded but module mapping not initialized; ");
@@ -462,7 +462,7 @@ fn do_inject(pid: u32) -> Result<(), String> {
 
         if do_status(pid).is_none() {
 
-            dbg_log(&format!("do_inject pid={}: LoadLibraryA returned OK but FileMapping OpenSpeedy.{} not seen within 2s",
+            dbg_log(&format!("do_inject pid={}: LoadLibraryA returned OK but FileMapping DzsSpeedy.{} not seen within 2s",
                       pid, pid));
 
             detail.push_str("A:DLL loaded but module mapping not initialized");
@@ -805,7 +805,7 @@ fn do_enable(pid: u32) -> Result<(), String> {
 
     }
 
-    Err(format!("ENABLE {pid}: OpenSpeedy.{pid} mapping not found (inject first)"))
+    Err(format!("ENABLE {pid}: DzsSpeedy.{pid} mapping not found (inject first)"))
 
 }
 
@@ -839,7 +839,7 @@ fn do_disable(pid: u32) -> Result<(), String> {
 
     }
 
-    Err(format!("DISABLE {pid}: failed to write OpenSpeedy.{pid}"))
+    Err(format!("DISABLE {pid}: failed to write DzsSpeedy.{pid}"))
 
 }
 
@@ -847,7 +847,7 @@ fn do_disable(pid: u32) -> Result<(), String> {
 
 fn do_is_enabled(pid: u32) -> Result<bool, String> {
 
-    read_speedpatch_enabled(pid).ok_or_else(|| format!("no OpenSpeedy.{pid} mapping"))
+    read_speedpatch_enabled(pid).ok_or_else(|| format!("no DzsSpeedy.{pid} mapping"))
 
 }
 
@@ -1088,11 +1088,11 @@ fn write_resp(h_pipe: HANDLE, msg: &str) {
 
 #[cfg(target_arch = "x86_64")]
 
-const PIPE_NAME: &str = r"\\.\pipe\OpenSpeedyBridge64";
+const PIPE_NAME: &str = r"\\.\pipe\DzsSpeedyBridge64";
 
 #[cfg(target_arch = "x86")]
 
-const PIPE_NAME: &str = r"\\.\pipe\OpenSpeedyBridge32";
+const PIPE_NAME: &str = r"\\.\pipe\DzsSpeedyBridge32";
 
 
 
@@ -1194,11 +1194,11 @@ fn pipe_server() {
 
 #[cfg(target_arch = "x86_64")]
 
-const BRIDGE_MUTEX: &str = "Global\\OpenSpeedyBridge64Mutex";
+const BRIDGE_MUTEX: &str = "Global\\DzsSpeedyBridge64Mutex";
 
 #[cfg(target_arch = "x86")]
 
-const BRIDGE_MUTEX: &str = "Global\\OpenSpeedyBridge32Mutex";
+const BRIDGE_MUTEX: &str = "Global\\DzsSpeedyBridge32Mutex";
 
 
 
@@ -1308,9 +1308,9 @@ fn acquire_bridge_singleton() -> bool {
 
 fn dbg_log(msg: &str) {
     // Bridge 是 windows_subsystem = "windows" — stderr 不可见。
-    // 写文件做诊断：%TEMP%\openspeedy-bridge.log
+    // 写文件做诊断：%TEMP%\dzsspeedy-bridge.log
     // 不锁定文件、无缓冲刷新；性能影响可忽略（仅诊断路径调用）。
-    let path = std::env::temp_dir().join("openspeedy-bridge.log");
+    let path = std::env::temp_dir().join("dzsspeedy-bridge.log");
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(
             f,

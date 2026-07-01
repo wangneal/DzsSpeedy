@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "OpenSpeedy",
+    "title": "鬥戰神遊戲加速器",
     "tabs": {
       "speed": "變速",
       "settings": "設定",
@@ -82,7 +82,7 @@
     "notSet": "未設定"
   },
   "about": {
-    "title": "OpenSpeedy",
+    "title": "鬥戰神遊戲加速器",
     "description": "開源遊戲變速控制器",
     "author": "作者",
     "license": "授權"

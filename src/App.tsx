@@ -33,7 +33,7 @@ function App() {
   const [gpuName, setGpuName] = useState("");
   const [gpuUsedMb, setGpuUsedMb] = useState(0);
   const [gpuTotalMb, setGpuTotalMb] = useState(0);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   // Sync Blueprint dark mode class
   useEffect(() => {
@@ -42,22 +42,24 @@ function App() {
 
   const theme = useMemo(() => createTheme({
     palette: {
-      mode: darkMode ? "dark" : "light",
-      primary: { main: "#5C6BC0" },
-      secondary: { main: "#00838F" },
-      background: darkMode ? { default: "#0D1117", paper: "#161B22" } : { default: "#F5F6FA", paper: "#FFFFFF" },
+      mode: "dark",
+      primary: { main: "#c9a96e" },        // 暗金 — 斗战神主色
+      secondary: { main: "#8b1a1a" },      // 血红
+      background: { default: "#0a0a0a", paper: "#181412" },
+      text: { primary: "#e6dcc8", secondary: "#a8987a" },
+      divider: "rgba(201, 169, 110, 0.18)",
     },
     typography: {
-      fontFamily: '"Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
+      fontFamily: '"Microsoft YaHei", "微软雅黑", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif',
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          body: { overflow: "hidden" },
+          body: { overflow: "hidden", backgroundColor: "#0a0a0a" },
           "::-webkit-scrollbar": { width: 6 },
           "::-webkit-scrollbar-track": { background: "transparent" },
-          "::-webkit-scrollbar-thumb": { background: darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.12)", borderRadius: 3 },
-          "::-webkit-scrollbar-thumb:hover": { background: darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.22)" },
+          "::-webkit-scrollbar-thumb": { background: "rgba(201, 169, 110, 0.18)", borderRadius: 3 },
+          "::-webkit-scrollbar-thumb:hover": { background: "rgba(201, 169, 110, 0.32)" },
         },
       },
     },
@@ -134,7 +136,7 @@ function App() {
               <Box sx={{ flex: 1, width: "100%", overflow: "auto" }}>
                 <Box sx={{ maxWidth: 400, mx: "auto", mt: 8, textAlign: "center", px: 2 }}>
                   <Box component="img" src={appIcon} sx={{ width: 80, height: 80, mb: 1 }} />
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>OpenSpeedy</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, color: "primary.main" }}>{t("app.title")}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
                     {t("about.description")}
                   </Typography>
@@ -142,7 +144,7 @@ function App() {
                   <Paper elevation={0} sx={{ p: 2.5, bgcolor: "background.paper", border: 1, borderColor: "divider", textAlign: "left" }}>
                     <Box sx={{ display: "flex", justifyContent: "space-between", py: 1, borderBottom: 1, borderColor: "divider" }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>{t("about.author")}</Typography>
-                      <Typography variant="body2">Game1024</Typography>
+                      <Typography variant="body2">wangneal</Typography>
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "space-between", py: 1, borderBottom: 1, borderColor: "divider" }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>{t("about.license")}</Typography>
@@ -159,9 +161,9 @@ function App() {
                     <Box sx={{ display: "flex", justifyContent: "space-between", py: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>GitHub</Typography>
                       <Typography variant="body2"
-                        onClick={() => open("https://github.com/game1024/OpenSpeedy")}
+                        onClick={() => open("https://github.com/wangneal/DzsSpeedy")}
                         sx={{ color: "primary.main", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
-                        github.com/game1024/OpenSpeedy
+                        github.com/wangneal/DzsSpeedy
                       </Typography>
                     </Box>
 

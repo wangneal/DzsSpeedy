@@ -4,7 +4,7 @@
     "quit": "退出"
   },
   "app": {
-    "title": "OpenSpeedy",
+    "title": "斗战神游戏加速器",
     "tabs": {
       "speed": "变速",
       "settings": "设置",
@@ -86,8 +86,8 @@
     "registerFail": "快捷键 \"{{shortcut}}\" 注册失败"
   },
   "about": {
-    "title": "OpenSpeedy",
-    "description": "开源游戏变速控制器",
+    "title": "斗战神游戏加速器",
+    "description": "斗战神游戏加速器 — 通过 DLL 注入实现对系统级速度感知的操控",
     "author": "作者",
     "license": "协议",
     "version": "版本",

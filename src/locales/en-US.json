@@ -4,7 +4,7 @@
     "quit": "Quit"
   },
   "app": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "tabs": {
       "speed": "Speed",
       "settings": "Settings",
@@ -86,7 +86,7 @@
     "registerFail": "Shortcut \"{{shortcut}}\" registration failed"
   },
   "about": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "description": "Open Source Game Speed Controller",
     "author": "Author",
     "license": "License",

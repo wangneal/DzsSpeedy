@@ -10,8 +10,8 @@ use windows::Win32::Storage::FileSystem::{
 
 use windows::Win32::System::Pipes::{SetNamedPipeHandleState, NAMED_PIPE_MODE, PIPE_READMODE_MESSAGE};
 
-const PIPE_64: &str = r"\\.\pipe\OpenSpeedyBridge64";
-const PIPE_32: &str = r"\\.\pipe\OpenSpeedyBridge32";
+const PIPE_64: &str = r"\\.\pipe\DzsSpeedyBridge64";
+const PIPE_32: &str = r"\\.\pipe\DzsSpeedyBridge32";
 
 fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
@@ -71,7 +71,7 @@ fn pipe_command(pipe: &str, cmd: &str) -> Option<String> {
 /// 让 release 模式也能取证。
 fn frontend_log(msg: &str) {
     use std::io::Write;
-    let path = std::env::temp_dir().join("openspeedy-frontend.log");
+    let path = std::env::temp_dir().join("dzsspeedy-frontend.log");
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         use std::time::{SystemTime, UNIX_EPOCH};
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();

@@ -7,7 +7,7 @@ use windows::core::PCWSTR;
 
 fn main() {
     // Single instance guard
-    let name: Vec<u16> = "OpenSpeedy_SingleInstance\0".encode_utf16().collect();
+    let name: Vec<u16> = "DzsSpeedy_SingleInstance\0".encode_utf16().collect();
     unsafe {
         if let Ok(h) = CreateMutexW(None, true, PCWSTR::from_raw(name.as_ptr())) {
             if GetLastError() == ERROR_ALREADY_EXISTS {
@@ -17,5 +17,5 @@ fn main() {
         }
     }
 
-    openspeedy_lib::run()
+    dzsspeedy_lib::run()
 }

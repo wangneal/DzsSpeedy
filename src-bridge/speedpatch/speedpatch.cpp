@@ -1,5 +1,5 @@
 ﻿/*
- * OpenSpeedy - Open Source Game Speed Controller
+ * DzsSpeedy (斗战神游戏加速器) — Windows 时间感知加速控制器
  * Copyright (C) 2025 Game1024
  *
  * This program is free software: you can redistribute it
@@ -44,7 +44,7 @@ static bool*  pEnabled;
 static void SP_DbgLog(const wchar_t* fmt, ...)
 {
     wchar_t buf[1024];
-    wchar_t prefix[] = L"[OpenSpeedySpeedpatch][pid=";
+    wchar_t prefix[] = L"[DzsSpeedy][pid=";
     // 把 pid 与 msg 拼到 buf
     int n = 0;
     n += wsprintfW(buf, L"%s%lu]", prefix, GetCurrentProcessId());
@@ -337,7 +337,7 @@ std::wstring GetCurrentProcessName()
 std::wstring GetProcessFileMapName(DWORD processId)
 {
     std::wstringstream wss;
-    wss << L"OpenSpeedy." << processId;
+    wss << L"DzsSpeedy." << processId;
     return wss.str();
 }
 

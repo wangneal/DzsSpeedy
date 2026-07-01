@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center"> OpenSpeedy </h1>
+<h1 align="center"> DzsSpeedy </h1>
 
 <p align="center">
   <img style="margin:0 auto" width=100 height=100 src="https://github.com/user-attachments/assets/a82ceda2-9b7b-41e4-96dc-cd250c9bd3ff">
@@ -16,36 +16,36 @@
 </p>
 
 <p align="center">
-  <img src="https://api.visitorbadge.io/api/visitors?path=game1024.openspeedy&countColor=%234ecdc4">
+  <img src="https://api.visitorbadge.io/api/visitors?path=wangneal.dzsspeedy&countColor=%234ecdc4">
   <br/>
     
-  <a href="https://github.com/game1024/OpenSpeedy/stargazers">
-    <img src="https://img.shields.io/github/stars/game1024/OpenSpeedy?style=for-the-badge&color=yellow" alt="GitHub Stars">
+  <a href="https://github.com/wangneal/DzsSpeedy/stargazers">
+    <img src="https://img.shields.io/github/stars/wangneal/DzsSpeedy?style=for-the-badge&color=yellow" alt="GitHub Stars">
   </a>
 
-  <img src="https://img.shields.io/github/forks/game1024/OpenSpeedy?style=for-the-badge&color=8a2be2" alt="GitHub Forks">
+  <img src="https://img.shields.io/github/forks/wangneal/DzsSpeedy?style=for-the-badge&color=8a2be2" alt="GitHub Forks">
 
-  <a href="https://github.com/game1024/OpenSpeedy/issues">
-    <img src="https://img.shields.io/github/issues-raw/game1024/OpenSpeedy?style=for-the-badge&label=Issues&color=orange" alt="Github Issues">
+  <a href="https://github.com/wangneal/DzsSpeedy/issues">
+    <img src="https://img.shields.io/github/issues-raw/wangneal/DzsSpeedy?style=for-the-badge&label=Issues&color=orange" alt="Github Issues">
   </a>
   <br/>  
   
-  <a href="https://github.com/game1024/OpenSpeedy/releases">
-    <img src="https://img.shields.io/github/downloads/game1024/OpenSpeedy/total?style=for-the-badge" alt="Downloads">
+  <a href="https://github.com/wangneal/DzsSpeedy/releases">
+    <img src="https://img.shields.io/github/downloads/wangneal/DzsSpeedy/total?style=for-the-badge" alt="Downloads">
   </a>
-  <a href="https://github.com/game1024/OpenSpeedy/releases">
-    <img src="https://img.shields.io/github/v/release/game1024/OpenSpeedy?style=for-the-badge&color=brightgreen" alt="Version">
+  <a href="https://github.com/wangneal/DzsSpeedy/releases">
+    <img src="https://img.shields.io/github/v/release/wangneal/DzsSpeedy?style=for-the-badge&color=brightgreen" alt="Version">
   </a>
-  <a href="https://github.com/game1024/OpenSpeedy/actions">
-      <img src="https://img.shields.io/github/actions/workflow/status/game1024/OpenSpeedy/build.yml?style=for-the-badge" alt="Github Action">
+  <a href="https://github.com/wangneal/DzsSpeedy/actions">
+      <img src="https://img.shields.io/github/actions/workflow/status/wangneal/DzsSpeedy/build.yml?style=for-the-badge" alt="Github Action">
   </a>
-  <a href="https://github.com/game1024/OpenSpeedy">
+  <a href="https://github.com/wangneal/DzsSpeedy">
     <img src="https://img.shields.io/badge/Platform-Windows-lightblue?style=for-the-badge" alt="Platform">
   </a>
   <br/>
   
-  <a href="https://github.com/game1024/OpenSpeedy/commits">
-    <img src="https://img.shields.io/github/commit-activity/m/game1024/OpenSpeedy?style=for-the-badge" alt="Activité des commits">
+  <a href="https://github.com/wangneal/DzsSpeedy/commits">
+    <img src="https://img.shields.io/github/commit-activity/m/wangneal/DzsSpeedy?style=for-the-badge" alt="Activité des commits">
   </a>
   <img src="https://img.shields.io/badge/language-C/C++-blue?style=for-the-badge">
   <img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=for-the-badge">
@@ -57,12 +57,12 @@
 </p>
 
 <p align="center">
-  🌐 <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.en-US.md">English</a> |
-  <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.de-DE.md">Deutsch</a> |
-  <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.fr-FR.md">Français</a> |
-  <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.ja-JP.md">日本語</a> |
-  <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.ko-KR.md">한국어</a> |
-  <a href="https://github.com/game1024/OpenSpeedy/blob/master/README.md">中文</a>
+  🌐 <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.en-US.md">English</a> |
+  <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.de-DE.md">Deutsch</a> |
+  <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.fr-FR.md">Français</a> |
+  <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.ja-JP.md">日本語</a> |
+  <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.ko-KR.md">한국어</a> |
+  <a href="https://github.com/wangneal/DzsSpeedy/blob/master/README.md">中文</a>
 </p>
 
 
@@ -78,15 +78,15 @@
 
 ``` powershell
 # Commande d'installation
-winget install openspeedy
+winget install dzsspeedy
 
-# Ouvrez un nouveau terminal et lancez openspeedy
-openspeedy
+# Ouvrez un nouveau terminal et lancez dzsspeedy
+dzsspeedy
 ```
 
 📥 **Méthode 2 : Téléchargement manuel**
 
-Visitez la [page des versions](https://github.com/game1024/OpenSpeedy/releases) pour télécharger la dernière version.
+Visitez la [page des versions](https://github.com/wangneal/DzsSpeedy/releases) pour télécharger la dernière version.
 
 
 # 💻 Configuration système requise
@@ -95,11 +95,11 @@ Visitez la [page des versions](https://github.com/game1024/OpenSpeedy/releases) 
 
 
 # 📝 Utilisation
-1. Lancez OpenSpeedy
+1. Lancez DzsSpeedy
 2. Lancez le jeu cible que vous souhaitez accélérer
 <img src="https://github.com/user-attachments/assets/648e721d-9c3a-4d82-954c-19b16355d084" width="50%">
 
-3. Sélectionnez le processus du jeu et ajustez le multiplicateur de vitesse dans l'interface OpenSpeedy
+3. Sélectionnez le processus du jeu et ajustez le multiplicateur de vitesse dans l'interface DzsSpeedy
 <img src="https://github.com/user-attachments/assets/9cd56353-1906-44c5-ba29-b5b4d2db2b80" width="50%"/>
 
 4. Effet immédiat — voir la comparaison ci-dessous
@@ -120,7 +120,7 @@ Commande de build :
 npm run tauri dev
 ```
 
-OpenSpeedy ajuste la vitesse du jeu en hookant les fonctions de temps système Windows suivantes :
+DzsSpeedy ajuste la vitesse du jeu en hookant les fonctions de temps système Windows suivantes :
 
 | Fonction | Bibliothèque | Rôle |
 |----------|-------------|------|
@@ -144,27 +144,27 @@ OpenSpeedy ajuste la vitesse du jeu en hookant les fonctions de temps système W
 
 # 🔄 Retour d'information
 Si vous rencontrez des problèmes, veuillez nous contacter via :
-- [FAQ](https://github.com/game1024/OpenSpeedy/wiki#faq) — Consultez d'abord le wiki pour les problèmes courants
-- [GitHub Issues](https://github.com/game1024/OpenSpeedy/issues) — Soumettez des rapports de bugs. Veuillez ne pas soumettre de problèmes liés au stockage cloud, merci de votre coopération~ 🙏
+- [FAQ](https://github.com/wangneal/DzsSpeedy/wiki#faq) — Consultez d'abord le wiki pour les problèmes courants
+- [GitHub Issues](https://github.com/wangneal/DzsSpeedy/issues) — Soumettez des rapports de bugs. Veuillez ne pas soumettre de problèmes liés au stockage cloud, merci de votre coopération~ 🙏
 
 
 # 📜 Licence
-OpenSpeedy est sous licence GPL v3.
+DzsSpeedy est sous licence GPL v3.
 
 # 🙏 Remerciements
-OpenSpeedy utilise le code source des projets suivants. Merci à la communauté open-source ! Si OpenSpeedy vous aide, n'hésitez pas à nous donner une étoile !
+DzsSpeedy utilise le code source des projets suivants. Merci à la communauté open-source ! Si DzsSpeedy vous aide, n'hésitez pas à nous donner une étoile !
 - [minhook](https://github.com/TsudaKageyu/minhook) : Pour le hooking d'API
 - [tauri](https://tauri.app/) : Interface graphique
 - [MUI](https://mui.com/) : Bibliothèque de composants UI
 - [Ant Design](https://ant.design/) : Composant de panneau divisé
 
-Avertissement : OpenSpeedy est destiné uniquement à des fins éducatives et de recherche. Les utilisateurs assument tous les risques et responsabilités liés à l'utilisation de ce logiciel. L'auteur n'est pas responsable des pertes ou de la responsabilité juridique découlant de l'utilisation de ce logiciel.
+Avertissement : DzsSpeedy est destiné uniquement à des fins éducatives et de recherche. Les utilisateurs assument tous les risques et responsabilités liés à l'utilisation de ce logiciel. L'auteur n'est pas responsable des pertes ou de la responsabilité juridique découlant de l'utilisation de ce logiciel.
 
-<a href="https://openomy.com/game1024/openspeedy" target="_blank" style="display: block; width: 100%;" align="center">
-  <img src="https://openomy.com/svg?repo=game1024/openspeedy&chart=bubble&latestMonth=6" target="_blank" alt="Contribution Leaderboard" style="display: block; width: 100%;" />
+<a href="https://openomy.com/wangneal/dzsspeedy" target="_blank" style="display: block; width: 100%;" align="center">
+  <img src="https://openomy.com/svg?repo=wangneal/dzsspeedy&chart=bubble&latestMonth=6" target="_blank" alt="Contribution Leaderboard" style="display: block; width: 100%;" />
 </a>
 
 
 <p align="center">
-  <img src="https://api.star-history.com/svg?repos=game1024/openspeedy&type=Date" Alt="Star History Chart">
+  <img src="https://api.star-history.com/svg?repos=wangneal/dzsspeedy&type=Date" Alt="Star History Chart">
 </p>

@@ -1,8 +1,8 @@
 [package]
-name = "openspeedy"
-version = "3.2.2"
-description = "Open Source Game Speed Controller"
-authors = ["Game1024"]
+name = "dzsspeedy"
+version = "0.1.0"
+description = "斗战神游戏加速器 (DzsSpeedy) — 通过 DLL 注入实现对系统级速度感知的操控"
+authors = ["wangneal"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +11,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "openspeedy_lib"
+name = "dzsspeedy_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "OpenSpeedy",
-  "version": "3.2.2",
-  "identifier": "com.game1024.openspeedy",
+  "productName": "DzsSpeedy",
+  "version": "0.1.0",
+  "identifier": "com.wangneal.dzsspeedy",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "OpenSpeedy",
+        "title": "斗战神游戏加速器",
         "width": 960,
         "height": 640,
         "minWidth": 480,
@@ -43,5 +43,18 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/wangneal/DzsSpeedy/releases/latest/download/{{target}}.json"
+      ],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
+

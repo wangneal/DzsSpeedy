@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "tabs": {
       "speed": "Tempo",
       "settings": "Einstellungen",
@@ -82,7 +82,7 @@
     "notSet": "Nicht gesetzt"
   },
   "about": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "description": "Open Source Game Speed Controller",
     "author": "Autor",
     "license": "Lizenz"

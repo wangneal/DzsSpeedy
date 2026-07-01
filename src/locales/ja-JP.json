@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "tabs": {
       "speed": "変速",
       "settings": "設定",
@@ -82,7 +82,7 @@
     "notSet": "未設定"
   },
   "about": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "description": "オープンソースゲーム速度コントローラー",
     "author": "作者",
     "license": "ライセンス"

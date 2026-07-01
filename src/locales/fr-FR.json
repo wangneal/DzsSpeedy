@@ -4,7 +4,7 @@
     "quit": "Quitter"
   },
   "app": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "tabs": {
       "speed": "Vitesse",
       "settings": "Paramètres",
@@ -86,7 +86,7 @@
     "notSet": "Non défini"
   },
   "about": {
-    "title": "OpenSpeedy",
+    "title": "DzsSpeedy",
     "description": "Contrôleur de Vitesse de Jeu Open Source",
     "author": "Auteur",
     "license": "Licence",
