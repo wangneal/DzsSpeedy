@@ -1,4 +1,4 @@
-﻿/*
+/*
  * OpenSpeedy - Open Source Game Speed Controller
  * Copyright (C) 2025 Game1024
  *
@@ -145,6 +145,12 @@ void SP_Install()
         0,
         sizeof (bool)
         );
+    if (pEnabled == NULL)
+    {
+        CloseHandle(hFileMap);
+        hFileMap = NULL;
+        return;
+    }
     *pEnabled = true;
 }
 
@@ -178,6 +184,11 @@ SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId)
                                           0,
                                           0,
                                           sizeof (bool));
+    if (pStatus == NULL)
+    {
+        CloseHandle(hFileMap_);
+        return FALSE;
+    }
     BOOL enabled = (*pStatus) ? TRUE : FALSE;
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);
@@ -200,6 +211,11 @@ void SP_Enable(DWORD processId)
                                           0,
                                           0,
                                           sizeof (bool));
+    if (pStatus == NULL)
+    {
+        CloseHandle(hFileMap_);
+        return;
+    }
     *pStatus = true;
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);
@@ -221,6 +237,11 @@ void SP_Disable(DWORD processId)
                                           0,
                                           0,
                                           sizeof (bool));
+    if (pStatus == NULL)
+    {
+        CloseHandle(hFileMap_);
+        return;
+    }
     *pStatus = false;
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);

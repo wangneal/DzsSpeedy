@@ -35,8 +35,11 @@ fn build_cmake_crate(
     println!("cargo:info=  -> {}", bin_dst.display());
 }
 
-/// Build a cmake project (cross arch) via cmake command line, copy the output binary.
-fn build_cmake_command(
+/// Build a cmake project for the non-host architecture via the cmake crate.
+///
+/// The cmake crate already knows how to find Visual Studio's bundled CMake even
+/// when `cmake.exe` is not on PATH, so use it for cross-arch builds too.
+fn build_cmake_cross(
     manifest_dir: &PathBuf,
     profile: &str,
     project_dir: &str,       // relative to manifest_dir, e.g. "../speedpatch"
@@ -48,34 +51,23 @@ fn build_cmake_command(
 ) {
     let build_type = if profile == "release" { "Release" } else { "Debug" };
     let bin_name = format!("{}{}.{}", bin_prefix, bin_suffix, file_ext);
-    let build_dir = manifest_dir.join("target").join(build_subdir).join(cmake_arch);
+    let build_root = manifest_dir.join("target").join(build_subdir).join(cmake_arch);
 
-    println!("cargo:info=[cmake cmd] building {bin_name} (-A {cmake_arch})...");
+    println!("cargo:info=[cmake crate] building {bin_name} (-A {cmake_arch})...");
 
-    let source_dir = manifest_dir.join(project_dir);
-    let status = Command::new("cmake")
-        .args([
-            "-S", &source_dir.to_string_lossy(),
-            "-B", &build_dir.to_string_lossy(),
-            "-A", cmake_arch,
-        ])
-        .status()
-        .expect("cmake configure failed");
+    let cmake_target = if cmake_arch.eq_ignore_ascii_case("Win32") {
+        "i686-pc-windows-msvc"
+    } else {
+        "x86_64-pc-windows-msvc"
+    };
 
-    if !status.success() {
-        panic!("cmake configure returned error for {}", bin_name);
-    }
+    let dst = cmake::Config::new(project_dir)
+        .out_dir(&build_root)
+        .target(cmake_target)
+        .define("CMAKE_BUILD_TYPE", build_type)
+        .build();
 
-    let status = Command::new("cmake")
-        .args(["--build", &build_dir.to_string_lossy(), "--config", build_type])
-        .status()
-        .expect("cmake build failed");
-
-    if !status.success() {
-        panic!("cmake build returned error for {}", bin_name);
-    }
-
-    let bin_src = build_dir.join(build_type).join(&bin_name);
+    let bin_src = dst.join("bin").join(&bin_name);
     let prof_dir = manifest_dir.join("target").join(profile);
     let bin_dst = prof_dir.join(&bin_name);
 
@@ -98,11 +90,11 @@ fn build_project(
     match target_arch {
         "x86_64" => {
             build_cmake_crate(manifest_dir, profile, project_dir, bin_prefix, "64", file_ext);
-            build_cmake_command(manifest_dir, profile, project_dir, "Win32", bin_prefix, "32", file_ext, build_subdir);
+            build_cmake_cross(manifest_dir, profile, project_dir, "Win32", bin_prefix, "32", file_ext, build_subdir);
         }
         "x86" => {
             build_cmake_crate(manifest_dir, profile, project_dir, bin_prefix, "32", file_ext);
-            build_cmake_command(manifest_dir, profile, project_dir, "x64", bin_prefix, "64", file_ext, build_subdir);
+            build_cmake_cross(manifest_dir, profile, project_dir, "x64", bin_prefix, "64", file_ext, build_subdir);
         }
         _ => unreachable!(),
     }
@@ -160,10 +152,14 @@ fn build_rust_bridge(manifest_dir: &PathBuf, profile: &str) {
             let dst = prof_dir.join("bridge32.exe");
             std::fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {} -> {} failed: {}", src.display(), dst.display(), e));
             println!("cargo:info=  -> {}", dst.display());
+        } else {
+            panic!("bridge32.exe build failed (i686-pc-windows-msvc). WOW64 games need bridge32.");
         }
     } else {
-        println!("cargo:warning=i686-pc-windows-msvc target not installed — skipping bridge32.exe");
-        println!("cargo:warning=Install with: rustup target add i686-pc-windows-msvc");
+        panic!(
+            "i686-pc-windows-msvc target not installed — cannot build bridge32.exe. \
+             32-bit/WOW64 games need bridge32. Run: rustup target add i686-pc-windows-msvc"
+        );
     }
 }
 

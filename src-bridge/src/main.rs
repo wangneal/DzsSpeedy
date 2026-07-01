@@ -233,13 +233,13 @@ fn do_enable(pid: u32) -> Result<(), String> {
         let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
 
         // Already enabled? — treat as success
-        let sp_is_enabled: Option<unsafe extern "system" fn(u32) -> i32> =
+        let sp_is_enabled: Option<unsafe extern "C" fn(u32) -> i32> =
             std::mem::transmute(GetProcAddress(h, s!("SP_IsEnabledById")));
         if let Some(f) = sp_is_enabled {
             if f(pid) != 0 { return Ok(()); }
         }
 
-        let sp_enable: Option<unsafe extern "system" fn(u32)> =
+        let sp_enable: Option<unsafe extern "C" fn(u32)> =
             std::mem::transmute(GetProcAddress(h, s!("SP_Enable")));
         sp_enable.ok_or("GetProcAddress SP_Enable failed")?(pid);
     }
@@ -250,7 +250,7 @@ fn do_disable(pid: u32) -> Result<(), String> {
     let dll_wide = to_wide(OWN_SPEEDPATCH);
     unsafe {
         let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
-        let sp_disable: Option<unsafe extern "system" fn(u32)> =
+        let sp_disable: Option<unsafe extern "C" fn(u32)> =
             std::mem::transmute(GetProcAddress(h, s!("SP_Disable")));
         sp_disable.ok_or("GetProcAddress SP_Disable failed")?(pid);
     }
@@ -261,7 +261,7 @@ fn do_is_enabled(pid: u32) -> Result<bool, String> {
     let dll_wide = to_wide(OWN_SPEEDPATCH);
     unsafe {
         let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
-        let sp_is_enabled: Option<unsafe extern "system" fn(u32) -> i32> =
+        let sp_is_enabled: Option<unsafe extern "C" fn(u32) -> i32> =
             std::mem::transmute(GetProcAddress(h, s!("SP_IsEnabledById")));
         Ok(sp_is_enabled.ok_or("GetProcAddress SP_IsEnabledById failed")?(pid) != 0)
     }
@@ -298,7 +298,7 @@ fn do_status(pid: u32) -> Option<bool> {
     let dll_wide = to_wide(OWN_SPEEDPATCH);
     unsafe {
         let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).ok()?;
-        let sp_is_enabled: Option<unsafe extern "system" fn(u32) -> i32> =
+        let sp_is_enabled: Option<unsafe extern "C" fn(u32) -> i32> =
             std::mem::transmute(GetProcAddress(h, s!("SP_IsEnabledById")));
         let enabled = sp_is_enabled?(pid) != 0;
         Some(enabled)
@@ -309,7 +309,7 @@ fn do_set_speed(factor: f64) {
     let dll_wide = to_wide(OWN_SPEEDPATCH);
     unsafe {
         let Ok(h) = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) else { return };
-        let set_speed: Option<unsafe extern "system" fn(f64)> =
+        let set_speed: Option<unsafe extern "C" fn(f64)> =
             std::mem::transmute(GetProcAddress(h, s!("SP_SetSpeed")));
         if let Some(f) = set_speed { f(factor); }
     }
@@ -319,7 +319,7 @@ fn do_get_speed() -> f64 {
     let dll_wide = to_wide(OWN_SPEEDPATCH);
     unsafe {
         let Ok(h) = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) else { return 1.0 };
-        let get_speed: Option<unsafe extern "system" fn() -> f64> =
+        let get_speed: Option<unsafe extern "C" fn() -> f64> =
             std::mem::transmute(GetProcAddress(h, s!("SP_GetSpeed")));
         if let Some(f) = get_speed { f() } else { 1.0 }
     }
