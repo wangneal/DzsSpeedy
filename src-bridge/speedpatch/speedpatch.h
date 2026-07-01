@@ -43,6 +43,8 @@ SPEEDPATCH_API void SP_Enable(DWORD processId);
 SPEEDPATCH_API void SP_Disable(DWORD processId);
 SPEEDPATCH_API void SP_SetSpeed(double factor_);
 SPEEDPATCH_API double SP_GetSpeed();
+SPEEDPATCH_API void SP_Shutdown();
+SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam);
 }
 
 #endif // SPEEDPATCH_H

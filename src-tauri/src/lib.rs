@@ -35,19 +35,16 @@ fn ensure_bridges() {
 }
 
 fn shutdown_bridges() {
-    // Send SHUTDOWN via pipes for graceful exit
+    // Ask bridges to exit, but do not kill them. A 32-bit SetWindowsHookEx injection
+    // must keep the installing bridge alive; force-killing it unloads the hook DLL
+    // inside the target process during app shutdown and can hang the target.
     bridge_client::bridge64_shutdown();
     bridge_client::bridge32_shutdown();
 
-    // Kill any remaining bridge processes
     if let Ok(mut children) = BRIDGE_CHILDREN.lock() {
-        for mut child in children.drain(..) {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        children.clear();
     }
 }
-
 #[tauri::command(async)]
 async fn get_process_list_fast() -> Vec<ProcessInfo> {
     process_enumerator::enumerate_processes_fast()

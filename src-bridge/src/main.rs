@@ -1,4 +1,4 @@
-﻿//! DzsSpeedy Bridge — named-pipe server (Rust).
+//! DzsSpeedy Bridge — named-pipe server (Rust).
 
 //!
 
@@ -27,6 +27,7 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -37,7 +38,7 @@ use windows::Win32::Foundation::{
 
     CloseHandle, GetLastError, HANDLE, BOOL, ERROR_ALREADY_EXISTS, ERROR_PIPE_CONNECTED,
 
-    INVALID_HANDLE_VALUE,
+    HINSTANCE, HWND, LPARAM, INVALID_HANDLE_VALUE,
 
 };
 
@@ -67,11 +68,11 @@ use windows::Win32::System::Memory::{
 
     VirtualFreeEx, FILE_MAP_ALL_ACCESS, FILE_MAP_READ, FILE_MAP_WRITE, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
 
-    PAGE_READWRITE,
+    PAGE_READWRITE, PAGE_EXECUTE_READWRITE,
 
 };
 
-use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
+use windows::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
 
@@ -87,6 +88,10 @@ use windows::Win32::System::LibraryLoader::{
 
 };
 
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindowThreadProcessId, IsWindowVisible, PostThreadMessageW,
+    SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, WH_GETMESSAGE, WM_NULL,
+};
 use windows::Win32::System::Pipes::{
 
     ConnectNamedPipe, CreateNamedPipeW, SetNamedPipeHandleState, PIPE_READMODE_MESSAGE,
@@ -97,6 +102,40 @@ use windows::Win32::System::Pipes::{
 
 
 
+fn retained_hooks() -> &'static Mutex<Vec<(u32, usize)>> {
+    static HOOKS: OnceLock<Mutex<Vec<(u32, usize)>>> = OnceLock::new();
+    HOOKS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn retain_hooks(pid: u32, hooks: Vec<HHOOK>) {
+    let mut guard = retained_hooks().lock().unwrap();
+    for hook in hooks {
+        guard.push((pid, hook.0 as usize));
+    }
+}
+
+fn release_retained_hooks(pid: u32) {
+    let mut guard = retained_hooks().lock().unwrap();
+    let mut kept = Vec::with_capacity(guard.len());
+    for (hook_pid, raw_hook) in guard.drain(..) {
+        if hook_pid == pid {
+            let _ = unsafe { UnhookWindowsHookEx(HHOOK(raw_hook as _)) };
+        } else {
+            kept.push((hook_pid, raw_hook));
+        }
+    }
+    *guard = kept;
+}
+
+fn retained_hook_count() -> usize {
+    retained_hooks().lock().map(|hooks| hooks.len()).unwrap_or(0)
+}
+fn retained_hook_count_for_pid(pid: u32) -> usize {
+    retained_hooks()
+        .lock()
+        .map(|hooks| hooks.iter().filter(|(hook_pid, _)| *hook_pid == pid).count())
+        .unwrap_or(0)
+}
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 
@@ -353,6 +392,83 @@ fn write_speedpatch_enabled(pid: u32, enabled: bool) -> Result<(), String> {
 
 
 
+struct EnumWindowsCtx {
+    pid: u32,
+    threads: Vec<u32>,
+}
+
+unsafe extern "system" fn enum_windows_for_pid(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let ctx = &mut *(lparam.0 as *mut EnumWindowsCtx);
+    let mut window_pid = 0u32;
+    let thread_id = GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
+    if window_pid == ctx.pid && thread_id != 0 {
+        if IsWindowVisible(hwnd).as_bool() && !ctx.threads.contains(&thread_id) {
+            ctx.threads.push(thread_id);
+        }
+    }
+    true.into()
+}
+
+fn target_window_threads(pid: u32) -> Vec<u32> {
+    let mut ctx = EnumWindowsCtx { pid, threads: Vec::new() };
+    unsafe {
+        let _ = EnumWindows(Some(enum_windows_for_pid), LPARAM(&mut ctx as *mut _ as isize));
+    }
+    ctx.threads
+}
+
+fn try_windows_hook_x86(pid: u32, dll_path: &str) -> Result<(), String> {
+    let threads = target_window_threads(pid);
+    dbg_log(&format!("try_windows_hook_x86: pid={} window_threads={:?}", pid, threads));
+    if threads.is_empty() {
+        return Err(format!("no visible window thread found for pid={pid}"));
+    }
+
+    let dll_w = to_wide(dll_path);
+    let hmod = unsafe { LoadLibraryW(PCWSTR::from_raw(dll_w.as_ptr())) }
+        .map_err(|e| format!("LoadLibraryW(local hook dll): {e:?}"))?;
+    let hook_proc = unsafe { GetProcAddress(hmod, s!("SP_HookProc")) }
+        .ok_or("GetProcAddress SP_HookProc failed")?;
+
+    let mut hooks: Vec<HHOOK> = Vec::new();
+    for thread_id in threads {
+        let hook = unsafe {
+            SetWindowsHookExW(
+                WH_GETMESSAGE,
+                Some(std::mem::transmute(hook_proc)),
+                HINSTANCE(hmod.0),
+                thread_id,
+            )
+        };
+        match hook {
+            Ok(h) => {
+                dbg_log(&format!("try_windows_hook_x86: SetWindowsHookExW OK thread={} hook={:?}", thread_id, h));
+                hooks.push(h);
+                let _ = unsafe { PostThreadMessageW(thread_id, WM_NULL, None, None) };
+            }
+            Err(e) => {
+                dbg_log(&format!("try_windows_hook_x86: SetWindowsHookExW FAILED thread={} err={:?}", thread_id, e));
+            }
+        }
+    }
+
+    if hooks.is_empty() {
+        return Err("SetWindowsHookExW failed for all target window threads".into());
+    }
+
+    for _ in 0..40 {
+        if read_speedpatch_enabled(pid).is_some() {
+            retain_hooks(pid, hooks);
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    for hook in hooks {
+        let _ = unsafe { UnhookWindowsHookEx(hook) };
+    }
+    Err(format!("SetWindowsHookExW installed but DzsSpeedy.{pid} mapping not created"))
+}
 // ── Core operations ──────────────────────────────────────────────────────
 
 
@@ -399,6 +515,21 @@ fn do_inject(pid: u32) -> Result<(), String> {
 
 
 
+    let mut detail = String::new();
+
+    if !is64 {
+        match try_windows_hook_x86(pid, &dll_str) {
+            Ok(()) => {
+                dbg_log(&format!("do_inject pid={}: SetWindowsHookEx + FileMapping OK", pid));
+                return do_enable(pid);
+            }
+            Err(e) => {
+                dbg_log(&format!("do_inject pid={}: SetWindowsHookEx path failed: {}", pid, e));
+                detail.push_str(&format!("Hook:{e}; "));
+            }
+        }
+    }
+
     let h_proc = unsafe {
 
         OpenProcess(
@@ -423,9 +554,26 @@ fn do_inject(pid: u32) -> Result<(), String> {
 
 
 
+    if !is64 {
+        match try_ldr_load_dll_x86(pid, &h_proc, &dll_str) {
+            Ok(()) => {
+                wait_post_inject(pid);
+                if do_status(pid).is_some() {
+                    dbg_log(&format!("do_inject pid={}: LdrLoadDll + FileMapping OK", pid));
+                    unsafe { let _ = CloseHandle(h_proc); }
+                    return do_enable(pid);
+                }
+                dbg_log(&format!("do_inject pid={}: LdrLoadDll returned OK but FileMapping DzsSpeedy.{} not seen within 2s", pid, pid));
+            }
+            Err(e) => {
+                dbg_log(&format!("do_inject pid={}: LdrLoadDll path failed: {}", pid, e));
+                detail.push_str(&format!("Ldr:{e}; "));
+            }
+        }
+    }
     let mut detail = String::new();
 
-    if let Err(e) = try_inject_impl(&h_proc, &dll_str, "LoadLibraryW", true) {
+    if let Err(e) = try_inject_impl(pid, &h_proc, &dll_str, "LoadLibraryW", true) {
 
         detail.push_str(&format!("W:{e}; "));
 
@@ -452,7 +600,7 @@ fn do_inject(pid: u32) -> Result<(), String> {
 
     }
 
-    if let Err(e) = try_inject_impl(&h_proc, &dll_str, "LoadLibraryA", false) {
+    if let Err(e) = try_inject_impl(pid, &h_proc, &dll_str, "LoadLibraryA", false) {
 
         detail.push_str(&format!("A:{e}"));
 
@@ -512,11 +660,202 @@ fn wait_post_inject(pid: u32) {
 
 
 
+fn remote_module_base(pid: u32, module_name: &str) -> Result<usize, String> {
+    let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid) }
+        .map_err(|e| format!("CreateToolhelp32Snapshot({pid}): {e:?}"))?;
+
+    let mut me = MODULEENTRY32W { dwSize: std::mem::size_of::<MODULEENTRY32W>() as u32, ..Default::default() };
+    let wanted = module_name.to_ascii_lowercase();
+    let mut found = None;
+
+    unsafe {
+        if Module32FirstW(snap, &mut me).is_ok() {
+            loop {
+                let name = String::from_utf16_lossy(&me.szModule)
+                    .trim_end_matches('\0')
+                    .to_ascii_lowercase();
+                if name == wanted {
+                    found = Some(me.modBaseAddr as usize);
+                    break;
+                }
+                if Module32NextW(snap, &mut me).is_err() { break; }
+            }
+        }
+        let _ = CloseHandle(snap);
+    }
+
+    found.ok_or_else(|| format!("module {module_name} not found in pid={pid}"))
+}
+
+fn remote_module_proc(pid: u32, module_name: &str, proc_name: &str) -> Result<(usize, usize, usize), String> {
+    let module_w = to_wide(module_name);
+    let local_module = unsafe { GetModuleHandleW(PCWSTR::from_raw(module_w.as_ptr())) }
+        .map_err(|e| format!("GetModuleHandleW({module_name}): {e:?}"))?;
+    let proc_cstr = std::ffi::CString::new(proc_name).unwrap();
+    let local_proc = unsafe { GetProcAddress(local_module, PCSTR::from_raw(proc_cstr.as_ptr() as *const u8)) }
+        .ok_or_else(|| format!("GetProcAddress {module_name}!{proc_name}"))? as usize;
+    let local_base = local_module.0 as usize;
+    let rva = local_proc
+        .checked_sub(local_base)
+        .ok_or_else(|| format!("{module_name}!{proc_name} address is below local module base"))?;
+    let remote_base = remote_module_base(pid, module_name)?;
+    Ok((remote_base + rva, local_proc, rva))
+}
+
+fn write_remote(h_proc: HANDLE, remote: usize, bytes: &[u8], label: &str) -> Result<(), String> {
+    let ok = unsafe { WriteProcessMemory(h_proc, remote as *const _, bytes.as_ptr() as _, bytes.len(), None) };
+    ok.map_err(|e| format!("WriteProcessMemory({label}, {} bytes): {e:?}", bytes.len()))
+}
+
+fn read_remote_u32(h_proc: HANDLE, remote: usize, label: &str) -> Result<u32, String> {
+    let mut buf = [0u8; 4];
+    let mut read = 0usize;
+    unsafe {
+        ReadProcessMemory(h_proc, remote as *const _, buf.as_mut_ptr() as _, buf.len(), Some(&mut read))
+    }.map_err(|e| format!("ReadProcessMemory({label}): {e:?}"))?;
+    if read != 4 {
+        return Err(format!("ReadProcessMemory({label}) read {read}/4"));
+    }
+    Ok(u32::from_le_bytes(buf))
+}
+
+fn push_u32(buf: &mut Vec<u8>, value: u32) {
+    buf.extend_from_slice(&value.to_le_bytes());
+}
+
+fn try_ldr_load_dll_x86(pid: u32, h_proc: &HANDLE, dll_path: &str) -> Result<(), String> {
+    let (ldr_load_dll, local_ldr_load_dll, ldr_rva) = remote_module_proc(pid, "ntdll.dll", "LdrLoadDll")?;
+    dbg_log(&format!("try_ldr_load_dll_x86: pid={} LdrLoadDll local=0x{:x} rva=0x{:x} remote=0x{:x}",
+              pid, local_ldr_load_dll, ldr_rva, ldr_load_dll));
+    log_remote_proc_bytes(h_proc, ldr_load_dll, local_ldr_load_dll, "LdrLoadDll");
+
+    if ldr_load_dll > u32::MAX as usize {
+        return Err(format!("LdrLoadDll remote address 0x{ldr_load_dll:x} is not 32-bit"));
+    }
+
+    let path_wide = to_wide(dll_path);
+    let path_bytes: Vec<u8> = path_wide.iter().flat_map(|c| c.to_le_bytes()).collect();
+    let path_len = path_bytes.len();
+    let unicode_off = (path_len + 3) & !3;
+    let hmodule_off = unicode_off + 8;
+    let status_off = hmodule_off + 4;
+    let code_off = status_off + 4;
+    let total_size = code_off + 64;
+
+    let remote_base = unsafe {
+        VirtualAllocEx(*h_proc, None, total_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE)
+    };
+    if remote_base.is_null() {
+        let gle = unsafe { GetLastError() };
+        return Err(format!("VirtualAllocEx(LdrLoadDll block) gle={}", gle.0));
+    }
+
+    let base = remote_base as usize;
+    let path_remote = base;
+    let unicode_remote = base + unicode_off;
+    let hmodule_remote = base + hmodule_off;
+    let status_remote = base + status_off;
+    let code_remote = base + code_off;
+
+    let result = (|| -> Result<(), String> {
+        write_remote(*h_proc, path_remote, &path_bytes, "ldr path")?;
+
+        let mut unicode = Vec::with_capacity(8);
+        let length = (path_len - 2) as u16;
+        let maximum_length = path_len as u16;
+        unicode.extend_from_slice(&length.to_le_bytes());
+        unicode.extend_from_slice(&maximum_length.to_le_bytes());
+        unicode.extend_from_slice(&(path_remote as u32).to_le_bytes());
+        write_remote(*h_proc, unicode_remote, &unicode, "UNICODE_STRING32")?;
+        write_remote(*h_proc, hmodule_remote, &[0, 0, 0, 0], "LdrLoadDll hmodule")?;
+        write_remote(*h_proc, status_remote, &[0xcc, 0xcc, 0xcc, 0xcc], "LdrLoadDll status")?;
+
+        let mut code = Vec::with_capacity(40);
+        code.push(0x68);
+        push_u32(&mut code, hmodule_remote as u32);
+        code.push(0x68);
+        push_u32(&mut code, unicode_remote as u32);
+        code.extend_from_slice(&[0x6a, 0x00]);
+        code.extend_from_slice(&[0x6a, 0x00]);
+        code.push(0xb8);
+        push_u32(&mut code, ldr_load_dll as u32);
+        code.extend_from_slice(&[0xff, 0xd0]);
+        code.push(0xa3);
+        push_u32(&mut code, status_remote as u32);
+        code.push(0xa1);
+        push_u32(&mut code, hmodule_remote as u32);
+        code.extend_from_slice(&[0xc2, 0x04, 0x00]);
+        write_remote(*h_proc, code_remote, &code, "LdrLoadDll x86 stub")?;
+
+        let h_thread = unsafe {
+            CreateRemoteThread(*h_proc, None, 0,
+                Some(std::mem::transmute(code_remote)), Some(remote_base), 0, None)
+        }.map_err(|e| format!("CreateRemoteThread(LdrLoadDll): {e:?}"))?;
+
+        unsafe { WaitForSingleObject(h_thread, 5000); }
+        let mut exit_code = 0u32;
+        let exit_ok = unsafe {
+            use windows::Win32::System::Threading::GetExitCodeThread;
+            GetExitCodeThread(h_thread, &mut exit_code)
+        };
+        unsafe { let _ = CloseHandle(h_thread); }
+        exit_ok.map_err(|_| "GetExitCodeThread(LdrLoadDll) failed".to_string())?;
+
+        let status = read_remote_u32(*h_proc, status_remote, "LdrLoadDll status")?;
+        let hmodule = read_remote_u32(*h_proc, hmodule_remote, "LdrLoadDll hmodule")?;
+        dbg_log(&format!("try_ldr_load_dll_x86: exit=0x{:08x} status=0x{:08x} hmodule=0x{:08x} dll={}",
+                  exit_code, status, hmodule, dll_path));
+
+        if status != 0 || hmodule == 0 {
+            return Err(format!("LdrLoadDll failed status=0x{status:08x} hmodule=0x{hmodule:08x} exit=0x{exit_code:08x}"));
+        }
+
+        Ok(())
+    })();
+
+    unsafe { let _ = VirtualFreeEx(*h_proc, remote_base, 0, MEM_RELEASE); }
+    result
+}
+fn remote_kernel32_proc(pid: u32, proc_name: &str) -> Result<(usize, usize, usize), String> {
+    let kernel32_w = to_wide("kernel32.dll");
+    let local_kernel32 = unsafe { GetModuleHandleW(PCWSTR::from_raw(kernel32_w.as_ptr())) }
+        .map_err(|e| format!("GetModuleHandleW(kernel32.dll): {e:?}"))?;
+    let proc_cstr = std::ffi::CString::new(proc_name).unwrap();
+    let local_proc = unsafe { GetProcAddress(local_kernel32, PCSTR::from_raw(proc_cstr.as_ptr() as *const u8)) }
+        .ok_or_else(|| format!("GetProcAddress {proc_name}"))? as usize;
+    let local_base = local_kernel32.0 as usize;
+    let rva = local_proc
+        .checked_sub(local_base)
+        .ok_or_else(|| format!("{proc_name} address is below local kernel32 base"))?;
+    let remote_base = remote_module_base(pid, "kernel32.dll")?;
+    Ok((remote_base + rva, local_proc, rva))
+}
+fn log_remote_proc_bytes(h_proc: &HANDLE, remote_proc: usize, local_proc: usize, fn_name: &str) {
+    let mut remote = [0u8; 16];
+    let mut read = 0usize;
+    let read_ok = unsafe {
+        ReadProcessMemory(
+            *h_proc,
+            remote_proc as *const _,
+            remote.as_mut_ptr() as _,
+            remote.len(),
+            Some(&mut read),
+        )
+    };
+
+    let local = unsafe { std::slice::from_raw_parts(local_proc as *const u8, 16) };
+    let local_hex = local.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+    let remote_hex = remote.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+    dbg_log(&format!(
+        "try_inject_impl: {} bytes local=[{}] remote_read={:?}/{} remote=[{}]",
+        fn_name, local_hex, read_ok, read, remote_hex
+    ));
+}
 /// Attempt injection with a specific LoadLibrary variant.
 
 /// `wide` = true → use wide-char path (LoadLibraryW), false → ANSI (LoadLibraryA).
 
-fn try_inject_impl(h_proc: &HANDLE, dll_path: &str, fn_name: &str, wide: bool) -> Result<(), String> {
+fn try_inject_impl(pid: u32, h_proc: &HANDLE, dll_path: &str, fn_name: &str, wide: bool) -> Result<(), String> {
 
     let path_bytes: Vec<u8> = if wide {
 
@@ -565,25 +904,10 @@ fn try_inject_impl(h_proc: &HANDLE, dll_path: &str, fn_name: &str, wide: bool) -
         let _ = WriteProcessMemory(*h_proc, remote_mem, path_bytes.as_ptr() as _, path_len, None);
 
     }
-
-
-
-    let kernel32 = unsafe {
-
-        GetModuleHandleW(PCWSTR::from_raw(to_wide("kernel32.dll").as_ptr()))
-
-    }.map_err(|e| format!("GetModuleHandleW {e:?}"))?;
-
-    let fn_cstr = std::ffi::CString::new(fn_name).unwrap();
-
-    let load_lib = unsafe {
-
-        GetProcAddress(kernel32, PCSTR::from_raw(fn_cstr.as_ptr() as *const u8))
-
-    }.ok_or_else(|| format!("GetProcAddress {fn_name}"))?;
-
-
-
+    let (load_lib, local_load_lib, load_lib_rva) = remote_kernel32_proc(pid, fn_name)?;
+    dbg_log(&format!("try_inject_impl: pid={} {} local=0x{:x} rva=0x{:x} remote=0x{:x}",
+              pid, fn_name, local_load_lib, load_lib_rva, load_lib));
+    log_remote_proc_bytes(h_proc, load_lib, local_load_lib, fn_name);
     let h_thread = unsafe {
 
         CreateRemoteThread(*h_proc, None, 0,
@@ -683,6 +1007,8 @@ fn do_eject(pid: u32) -> Result<(), String> {
 
     let dll_name = speedpatch_dll(is64);
 
+    let had_retained_hook = retained_hook_count_for_pid(pid) > 0;
+
 
 
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid) }
@@ -745,6 +1071,54 @@ fn do_eject(pid: u32) -> Result<(), String> {
 
 
 
+    let local_dll = exe_dir().join(&dll_name);
+
+    let local_dll_w = to_wide(&local_dll.to_string_lossy());
+
+    let local_mod = unsafe { LoadLibraryW(PCWSTR::from_raw(local_dll_w.as_ptr())) }
+
+        .map_err(|e| format!("LoadLibraryW(local {dll_name}): {e:?}"))?;
+
+    let shutdown_proc = unsafe { GetProcAddress(local_mod, s!("SP_Shutdown")) }
+
+        .ok_or("GetProcAddress SP_Shutdown failed")? as usize;
+
+    let shutdown_rva = shutdown_proc
+
+        .checked_sub(local_mod.0 as usize)
+
+        .ok_or("SP_Shutdown address below module base")?;
+
+    let remote_shutdown = h_mod_ptr as usize + shutdown_rva;
+
+
+
+    let h_shutdown = unsafe {
+
+        CreateRemoteThread(h_proc, None, 0,
+
+            Some(std::mem::transmute(remote_shutdown)), None, 0, None)
+
+    }.map_err(|e| format!("CreateRemoteThread(SP_Shutdown): {e:?}"))?;
+
+    unsafe { WaitForSingleObject(h_shutdown, 5000); }
+
+    unsafe { let _ = CloseHandle(h_shutdown); }
+
+
+
+    if had_retained_hook {
+
+        release_retained_hooks(pid);
+
+        unsafe { let _ = CloseHandle(h_proc); }
+
+        return Ok(());
+
+    }
+
+
+
     let kernel32 = unsafe {
 
         GetModuleHandleW(PCWSTR::from_raw(to_wide("kernel32.dll").as_ptr()))
@@ -763,7 +1137,7 @@ fn do_eject(pid: u32) -> Result<(), String> {
 
             Some(std::mem::transmute(free_lib)), Some(h_mod_ptr), 0, None)
 
-    }.map_err(|e| format!("CreateRemoteThread: {e:?}"))?;
+    }.map_err(|e| format!("CreateRemoteThread(FreeLibrary): {e:?}"))?;
 
 
 
@@ -774,7 +1148,6 @@ fn do_eject(pid: u32) -> Result<(), String> {
     Ok(())
 
 }
-
 
 
 fn do_enable(pid: u32) -> Result<(), String> {
@@ -1164,6 +1537,14 @@ fn pipe_server() {
 
                 if line.eq_ignore_ascii_case("SHUTDOWN") {
 
+                    if retained_hook_count() > 0 {
+
+                        write_resp(h_pipe, "OK hooks active; bridge staying alive\n");
+
+                        continue;
+
+                    }
+
                     write_resp(h_pipe, "OK shutting down\n");
 
                     unsafe { let _ = CloseHandle(h_pipe); }
@@ -1171,7 +1552,6 @@ fn pipe_server() {
                     std::process::exit(0);
 
                 }
-
                 let resp = handle_command(line);
 
                 write_resp(h_pipe, &format!("{resp}\n"));

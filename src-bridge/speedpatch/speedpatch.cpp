@@ -1,4 +1,4 @@
-﻿/*
+/*
  * DzsSpeedy (斗战神游戏加速器) — Windows 时间感知加速控制器
  * Copyright (C) 2026 wangneal
  *
@@ -180,6 +180,10 @@ SPEEDPATCH_API double SP_GetSpeed()
     return factor;
 }
 
+SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam)
+{
+    return CallNextHookEx(NULL, code, wParam, lParam);
+}
 void SP_Install()
 {
     DWORD processId = GetCurrentProcessId();
@@ -235,6 +239,30 @@ void SP_Uninstall()
         UnmapViewOfFile(pEnabled);
         CloseHandle(hFileMap);
     }
+}
+SPEEDPATCH_API void SP_Shutdown()
+{
+    SP_DbgLog(L"SP_Shutdown: begin");
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex);
+        MH_DisableHook(MH_ALL_HOOKS);
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realSleep));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realSleepEx));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetWaitableTimer));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetWaitableTimerEx));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetTimer));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realTimeGetTime));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realTimeSetEvent));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetMessageTime));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetTickCount));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetTickCount64));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realQueryPerformanceCounter));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetSystemTimeAsFileTime));
+        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetSystemTimePreciseAsFileTime));
+        MH_Uninitialize();
+    }
+    SP_Uninstall();
+    SP_DbgLog(L"SP_Shutdown: done");
 }
 
 BOOL SP_IsEnabled()
@@ -855,33 +883,8 @@ BOOL APIENTRY DllMain(HMODULE hModule,
         break;
     case DLL_PROCESS_DETACH:
     {
-        {
-            std::unique_lock<std::shared_mutex> lock(mutex);
-            MH_DisableHook(MH_ALL_HOOKS);
-        }
-        {
-            std::unique_lock<std::shared_mutex> lock(mutex);
-            MH_UNHOOK(realSleep);
-            MH_UNHOOK(realSetWaitableTimer);
-            MH_UNHOOK(realSetWaitableTimerEx);
-            MH_UNHOOK(realSetTimer);
-            MH_UNHOOK(realTimeGetTime);
-            MH_UNHOOK(realTimeSetEvent);
-            MH_UNHOOK(realGetTickCount);
-            MH_UNHOOK(realGetTickCount64);
-            MH_UNHOOK(realQueryPerformanceCounter);
-            MH_UNHOOK(realGetSystemTimeAsFileTime);
-            MH_UNHOOK(realGetSystemTimePreciseAsFileTime);
-        }
-        // Wait for All threads to finish detour api
-        Sleep(1000);
-        {
-            std::unique_lock<std::shared_mutex> lock(mutex);
-            if (MH_Uninitialize() != MH_OK)
-            {
-                return FALSE;
-            }
-        }
+        // Do not call MinHook, take locks, or sleep under the loader lock.
+        // Full hook cleanup is done by SP_Shutdown during explicit EJECT.
         SP_Uninstall();
         break;
     }

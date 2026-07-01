@@ -46,6 +46,9 @@ add_library(${TARGET_NAME} SHARED
 
 target_link_libraries(${TARGET_NAME} PRIVATE minhook winmm)
 target_compile_definitions(${TARGET_NAME} PRIVATE SPEEDPATCH_LIBRARY _CRT_SECURE_NO_WARNINGS)
+if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+    target_link_options(${TARGET_NAME} PRIVATE "/EXPORT:SP_HookProc=_SP_HookProc@12")
+endif()
 
 # shared section for factor
 set_target_properties(${TARGET_NAME} PROPERTIES
