@@ -1,18 +1,11 @@
 <p align="center">
-  <a href="https://ref.365tz87989.com/?r=RWQVZD">
-  <img src="https://github.com/user-attachments/assets/bde1585b-d0ca-4892-b84a-9c0276804422" />
-  </a>
+  <img src="https://github.com/user-attachments/assets/a82ceda2-9b7b-41e4-96dc-cd250c9bd3ff" width="120" />
 </p>
 
 <h1 align="center"> DzsSpeedy </h1>
 
 <p align="center">
-  <img style="margin:0 auto" width=100 height=100 src="https://github.com/user-attachments/assets/a82ceda2-9b7b-41e4-96dc-cd250c9bd3ff">
-  </img>  
-</p>
-
-<p align="center">
-  最好用的开源游戏变速器
+  最好用的开源斗战神加速器 · 游戏变速器
 </p>
 
 <p align="center">
@@ -50,10 +43,6 @@
   <img src="https://img.shields.io/badge/language-C/C++-blue?style=for-the-badge">
   <img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=for-the-badge">
   <br/>
-
-  <a href="https://hellogithub.com/repository/975f473c56ad4369a1c30ac9aa5819e0" target="_blank">
-    <img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=975f473c56ad4369a1c30ac9aa5819e0&claim_uid=kmUCncHJr9SpNV7&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
-  </a>
 </p>
 
 <p align="center">
@@ -96,8 +85,8 @@ dzsspeedy
 
 # 📝 使用说明
 1. 启动 DzsSpeedy
-2. 运行需要变速的目标游戏
-<img src="https://github.com/user-attachments/assets/648e721d-9c3a-4d82-954c-19b16355d084" width="50%">
+2. 运行需要变速的目标游戏（斗战神）
+<img src="public/dzs-bg.png" width="50%">
 
 3. 勾选游戏进程，在 DzsSpeedy 界面中调整速度倍率
 <img src="https://github.com/user-attachments/assets/9cd56353-1906-44c5-ba29-b5b4d2db2b80" width="50%"/>
