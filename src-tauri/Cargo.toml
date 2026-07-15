@@ -1,6 +1,6 @@
 [package]
 name = "dzsspeedy"
-version = "0.1.1"
+version = "0.1.2"
 description = "斗战神游戏加速器 (DzsSpeedy) — 通过 DLL 注入实现对系统级速度感知的操控"
 authors = ["wangneal"]
 edition = "2021"

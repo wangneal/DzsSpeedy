@@ -6,7 +6,7 @@ import { useInterval } from "ahooks";
 import { Splitter } from "antd";
 import {
   Box, Paper, Typography, Avatar, Switch, TextField,
-  Divider, Table, TableCell, TableHead, TableRow,
+  Divider, Table, TableCell, TableHead, TableRow, Chip,
 } from "@mui/material";
 import WindowIcon from "@mui/icons-material/Window";
 import SearchIcon from "@mui/icons-material/Search";
@@ -101,8 +101,18 @@ const ProcessTable = function ProcessTable({
         <Typography variant="caption" sx={{ ml: 1, fontWeight: 600, color: "primary.main" }}>{filtered.length} / {processes.length}</Typography>
       </Box>
 
-      <Box sx={{ px: 2, pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ px: 2, pb: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
         <TextField placeholder={t("process.search")} variant="outlined" size="small" fullWidth value={search} onChange={e => onSearch(e.target.value)} />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Chip
+            label="Asura"
+            size="small"
+            color={search.trim().toLowerCase() === "asura" ? "primary" : "default"}
+            variant={search.trim().toLowerCase() === "asura" ? "filled" : "outlined"}
+            onClick={() => onSearch(search.trim().toLowerCase() === "asura" ? "" : "Asura")}
+            sx={{ cursor: "pointer" }}
+          />
+        </Box>
       </Box>
       <Divider />
 
