@@ -1,7 +1,9 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Box, Paper, Typography, Slider, ButtonBase } from "@mui/material";
+import { Box, Paper, Typography, Slider, ButtonBase, IconButton } from "@mui/material";
 import SpeedIcon from "@mui/icons-material/Speed";
+import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
 // ── Speed mapping: slider [-999, 999] → speed [0.001, 1000], 1× at 0 ──
 
 export function toSpeed(v: number): number {
@@ -11,6 +13,14 @@ export function toSpeed(v: number): number {
 export function toSlider(s: number): number {
   if (s <= 1.0) return (s - 1) / 0.001;
   else          return s - 1;
+}
+
+const SPEED_MIN = 0.001;
+const SPEED_MAX = 1000;
+const SPEED_STEP = 0.5;
+
+function clampSpeed(s: number): number {
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, Math.round(s * 1000) / 1000));
 }
 
 interface SpeedPanelProps {
@@ -25,6 +35,12 @@ export default React.memo(function SpeedPanel({ speed, gears, onChange, onCommit
   const active = (g: number) => Math.abs(speed - g) < 0.001;
 
   const speedColor = speed > 1.01 ? "secondary.main" : speed < 0.99 ? "warning.main" : "primary.main";
+
+  function nudge(delta: number) {
+    const next = clampSpeed(speed + delta);
+    onChange(next);
+    onCommit(next);
+  }
 
   return (
     <Paper elevation={0}
@@ -55,14 +71,32 @@ export default React.memo(function SpeedPanel({ speed, gears, onChange, onCommit
           {speed.toFixed(2)}<Typography component="span" variant="h5" sx={{ fontWeight: 600, color: "text.secondary" }}>×</Typography>
         </Typography>
 
-        <Slider
-          value={toSlider(speed)}
-          onChange={(_, v) => onChange(toSpeed(v as number))}
-          onChangeCommitted={(_, v) => onCommit(toSpeed(v as number))}
-          min={-999} max={999} step={1}
-          size="small"
-          sx={{ color: speedColor, mb: 0.5 }}
-        />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <IconButton
+            size="small"
+            onClick={() => nudge(-SPEED_STEP)}
+            disabled={speed <= SPEED_MIN}
+            sx={{ flexShrink: 0, border: 1, borderColor: "divider", width: 28, height: 28 }}
+          >
+            <RemoveIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <Slider
+            value={toSlider(speed)}
+            onChange={(_, v) => onChange(toSpeed(v as number))}
+            onChangeCommitted={(_, v) => onCommit(toSpeed(v as number))}
+            min={-999} max={999} step={1}
+            size="small"
+            sx={{ color: speedColor, mx: 0.5, flex: 1 }}
+          />
+          <IconButton
+            size="small"
+            onClick={() => nudge(SPEED_STEP)}
+            disabled={speed >= SPEED_MAX}
+            sx={{ flexShrink: 0, border: 1, borderColor: "divider", width: 28, height: 28 }}
+          >
+            <AddIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Box>
       </Box>
 
       {/* ── Reset ── */}
