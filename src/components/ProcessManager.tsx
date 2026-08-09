@@ -73,7 +73,12 @@ const ProcessRow = React.memo(function ProcessRow({
     </Box>
   );
 }, (prev, next) =>
-  prev.p.pid === next.p.pid && prev.on === next.on && prev.start === next.start && prev.selected === next.selected
+  prev.p.pid === next.p.pid &&
+  prev.p.name === next.p.name &&
+  prev.p.arch === next.p.arch &&
+  prev.on === next.on &&
+  prev.start === next.start &&
+  prev.selected === next.selected
 );
 
 const ProcessTable = function ProcessTable({

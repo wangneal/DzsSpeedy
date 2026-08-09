@@ -8,17 +8,18 @@ use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
     BITMAPINFOHEADER, DIB_RGB_COLORS,
 };
+use windows::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, Process32FirstW, Process32NextW,
     MODULEENTRY32W, PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPPROCESS,
 };
 use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
-use windows::Win32::System::Threading::{
-    IsWow64Process, OpenProcess, OpenProcessToken, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ,
+use windows::Win32::System::SystemInformation::{
+    IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_UNKNOWN,
 };
-use windows::Win32::Security::{
-    GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
+use windows::Win32::System::Threading::{
+    IsWow64Process2, OpenProcess, OpenProcessToken, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ,
 };
 use windows::Win32::UI::Shell::ExtractIconExW;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -52,7 +53,14 @@ fn cache_get(pid: u32) -> Option<CachedInfo> {
     })
 }
 
-fn cache_set(pid: u32, arch: String, window_title: Option<String>, memory_kb: u64, exe_path: Option<String>, admin: bool) {
+fn cache_set(
+    pid: u32,
+    arch: String,
+    window_title: Option<String>,
+    memory_kb: u64,
+    exe_path: Option<String>,
+    admin: bool,
+) {
     if let Ok(mut cache) = cache().lock() {
         cache.insert(
             pid,
@@ -167,12 +175,22 @@ pub fn enumerate_processes_fast() -> Vec<ProcessInfo> {
                 .to_string();
 
             if !name.is_empty() {
-                // Merge from cache
+                // Refresh architecture on every fast pass. Architecture is cheap to
+                // query and PID reuse must never inherit a stale x86/x64 result.
                 if let Some(cached) = cache_get(pid) {
+                    let arch = detect_arch(pid);
+                    cache_set(
+                        pid,
+                        arch.clone(),
+                        cached.window_title.clone(),
+                        cached.memory_kb,
+                        cached.exe_path.clone(),
+                        cached.admin,
+                    );
                     processes.push(ProcessInfo {
                         pid,
                         name,
-                        arch: cached.arch,
+                        arch,
                         window_title: cached.window_title,
                         memory_kb: cached.memory_kb,
                         exe_path: cached.exe_path,
@@ -237,7 +255,14 @@ pub fn enumerate_processes_full() -> Vec<ProcessInfo> {
                 let exe_path = get_exe_path(pid);
                 let admin = is_admin(pid);
 
-                cache_set(pid, arch.clone(), window_title.clone(), memory_kb, exe_path.clone(), admin);
+                cache_set(
+                    pid,
+                    arch.clone(),
+                    window_title.clone(),
+                    memory_kb,
+                    exe_path.clone(),
+                    admin,
+                );
 
                 processes.push(ProcessInfo {
                     pid,
@@ -349,9 +374,7 @@ fn extract_icon_base64(exe_path: &str) -> Option<String> {
 
 /// Render HICON to a 32bpp RGBA buffer via DrawIconEx (Windows handles mask/transparency),
 /// then encode as PNG data URI.
-fn icon_to_png_data(
-    hicon: windows::Win32::UI::WindowsAndMessaging::HICON,
-) -> Option<String> {
+fn icon_to_png_data(hicon: windows::Win32::UI::WindowsAndMessaging::HICON) -> Option<String> {
     const ICON_SIZE: i32 = 24;
 
     // Create screen-compatible DC
@@ -379,16 +402,7 @@ fn icon_to_png_data(
     };
 
     let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-    let hbm = unsafe {
-        CreateDIBSection(
-            hdc_screen,
-            &bmi,
-            DIB_RGB_COLORS,
-            &mut bits,
-            None,
-            0,
-        )
-    };
+    let hbm = unsafe { CreateDIBSection(hdc_screen, &bmi, DIB_RGB_COLORS, &mut bits, None, 0) };
 
     let hbm = match hbm {
         Ok(h) if !h.is_invalid() => h,
@@ -408,15 +422,7 @@ fn icon_to_png_data(
 
     let _ = unsafe {
         DrawIconEx(
-            hdc_screen,
-            0,
-            0,
-            hicon,
-            ICON_SIZE,
-            ICON_SIZE,
-            0,
-            None,
-            DI_NORMAL,
+            hdc_screen, 0, 0, hicon, ICON_SIZE, ICON_SIZE, 0, None, DI_NORMAL,
         )
     };
 
@@ -427,7 +433,7 @@ fn icon_to_png_data(
     // Raw BGRA → RGBA for PNG encoder
     let mut rgba = vec![0u8; pixel_count * 4];
     for (i, chunk) in raw.chunks_exact(4).enumerate() {
-        rgba[i * 4] = chunk[2];     // R
+        rgba[i * 4] = chunk[2]; // R
         rgba[i * 4 + 1] = chunk[1]; // G
         rgba[i * 4 + 2] = chunk[0]; // B
         rgba[i * 4 + 3] = chunk[3]; // A (set by DrawIconEx via mask)
@@ -457,7 +463,9 @@ fn icon_to_png_data(
 }
 
 fn is_admin(pid: u32) -> bool {
-    if pid == 0 { return false; }
+    if pid == 0 {
+        return false;
+    }
 
     // Try hardest first, fall back to limited (works on protected processes)
     let handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, false, pid) }
@@ -492,21 +500,31 @@ fn is_admin(pid: u32) -> bool {
 }
 
 fn detect_arch(pid: u32) -> String {
-    let handle = open_process(pid);
-    if handle.is_none() {
-        return "x64".to_string();
-    }
-    let handle = handle.unwrap();
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }
+        .or_else(|_| unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, false, pid) });
+    let handle = match handle {
+        Ok(handle) => handle,
+        Err(_) => return "unknown".to_string(),
+    };
 
-    let mut is_wow64 = windows::Win32::Foundation::BOOL::default();
-    let result = unsafe { IsWow64Process(handle, &mut is_wow64) };
+    let mut process_machine = IMAGE_FILE_MACHINE_UNKNOWN;
+    let mut native_machine = IMAGE_FILE_MACHINE_UNKNOWN;
+    let result =
+        unsafe { IsWow64Process2(handle, &mut process_machine, Some(&mut native_machine)) };
 
     let _ = unsafe { CloseHandle(handle) };
 
-    if result.is_ok() && is_wow64.as_bool() {
-        "x86".to_string()
-    } else {
-        "x64".to_string()
+    if result.is_err() {
+        return "unknown".to_string();
+    }
+    if process_machine != IMAGE_FILE_MACHINE_UNKNOWN {
+        return "x86".to_string();
+    }
+
+    match native_machine {
+        IMAGE_FILE_MACHINE_AMD64 | IMAGE_FILE_MACHINE_ARM64 => "x64".to_string(),
+        IMAGE_FILE_MACHINE_UNKNOWN => "unknown".to_string(),
+        _ => "unknown".to_string(),
     }
 }
 

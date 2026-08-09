@@ -191,6 +191,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../src-bridge/speedpatch/");
     println!("cargo:rerun-if-changed=../src-bridge/third_party/minhook/");
     println!("cargo:rerun-if-changed=../src-bridge/src/");
+    println!("cargo:rerun-if-changed=windows/app.manifest");
 
     // Copy binaries to resources folder for Tauri bundling
     let bin_dir = manifest_dir.join("binaries");
@@ -205,5 +206,8 @@ fn main() {
         }
     }
 
-    tauri_build::build();
+    let windows = tauri_build::WindowsAttributes::new()
+        .app_manifest(include_str!("windows/app.manifest"));
+    let attributes = tauri_build::Attributes::new().windows_attributes(windows);
+    tauri_build::try_build(attributes).expect("failed to run Tauri build script");
 }

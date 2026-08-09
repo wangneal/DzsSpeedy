@@ -2,8 +2,8 @@ mod bridge_client;
 mod process_enumerator;
 mod system_stats;
 
-use process_enumerator::ProcessInfo;
 use process_enumerator::ModuleInfo;
+use process_enumerator::ProcessInfo;
 use std::process::Child;
 use std::sync::Mutex;
 
@@ -11,7 +11,9 @@ static BRIDGE_CHILDREN: Mutex<Vec<Child>> = Mutex::new(Vec::new());
 
 fn ensure_bridges() {
     let mut children = BRIDGE_CHILDREN.lock().unwrap();
-    if !children.is_empty() { return; }
+    if !children.is_empty() {
+        return;
+    }
 
     let exe_dir = std::env::current_exe()
         .ok()
@@ -94,28 +96,28 @@ async fn get_system_stats() -> system_stats::SystemStats {
 
 #[tauri::command(async)]
 async fn bridge_inject(pid: u32, arch: String) -> bool {
-    if arch == "x86" {
-        bridge_client::bridge32_inject(pid)
-    } else {
-        bridge_client::bridge64_inject(pid)
+    match arch.as_str() {
+        "x86" => bridge_client::bridge32_inject(pid),
+        "x64" => bridge_client::bridge64_inject(pid),
+        _ => false,
     }
 }
 
 #[tauri::command(async)]
 async fn bridge_enable(pid: u32, arch: String) -> bool {
-    if arch == "x86" {
-        bridge_client::bridge32_enable(pid)
-    } else {
-        bridge_client::bridge64_enable(pid)
+    match arch.as_str() {
+        "x86" => bridge_client::bridge32_enable(pid),
+        "x64" => bridge_client::bridge64_enable(pid),
+        _ => false,
     }
 }
 
 #[tauri::command(async)]
 async fn bridge_disable(pid: u32, arch: String) -> bool {
-    if arch == "x86" {
-        bridge_client::bridge32_disable(pid)
-    } else {
-        bridge_client::bridge64_disable(pid)
+    match arch.as_str() {
+        "x86" => bridge_client::bridge32_disable(pid),
+        "x64" => bridge_client::bridge64_disable(pid),
+        _ => false,
     }
 }
 
@@ -123,10 +125,10 @@ async fn bridge_disable(pid: u32, arch: String) -> bool {
 /// Returns Some(true) = enabled, Some(false) = injected but disabled, None = not injected.
 #[tauri::command(async)]
 async fn bridge_get_status(pid: u32, arch: String) -> Option<bool> {
-    if arch == "x86" {
-        bridge_client::bridge32_get_status(pid)
-    } else {
-        bridge_client::bridge64_get_status(pid)
+    match arch.as_str() {
+        "x86" => bridge_client::bridge32_get_status(pid),
+        "x64" => bridge_client::bridge64_get_status(pid),
+        _ => None,
     }
 }
 
