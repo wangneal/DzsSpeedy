@@ -34,6 +34,7 @@
     "injectFail": "Injektion fehlgeschlagen",
     "enableFail": "Aktivierung fehlgeschlagen",
     "disableFail": "Deaktivierung fehlgeschlagen",
+    "statusFail": "Abfrage des Injektionsstatus fehlgeschlagen",
     "detail": {
       "title": "Prozessdetails",
       "pid": "Prozess-ID",
@@ -48,7 +49,10 @@
       "statusInjected": "Injiziert",
       "statusEnabled": "Aktiviert",
       "statusDisabled": "Deaktiviert",
+      "statusInitializing": "Initialisierung",
+      "statusFailed": "Injektion fehlgeschlagen",
       "statusNotInjected": "Nicht injiziert",
+      "lastError": "Letzter Fehler",
       "noSelection": "Wählen Sie einen Prozess aus der Liste, um Details anzuzeigen",
       "yes": "Ja",
       "no": "Nein",

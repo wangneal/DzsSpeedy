@@ -38,6 +38,7 @@
     "injectFail": "Injection failed",
     "enableFail": "Failed to enable speed",
     "disableFail": "Failed to disable speed",
+    "statusFail": "Failed to query injection status",
     "detail": {
       "title": "Process Detail",
       "pid": "Process ID",
@@ -52,7 +53,10 @@
       "statusInjected": "Injected",
       "statusEnabled": "Speed Enabled",
       "statusDisabled": "Speed Disabled",
+      "statusInitializing": "Initializing",
+      "statusFailed": "Injection Failed",
       "statusNotInjected": "Not Injected",
+      "lastError": "Last Error",
       "noSelection": "Select a process from the list to view details",
       "yes": "Yes",
       "no": "No",

@@ -37,14 +37,14 @@ extern "C"
 {
 SPEEDPATCH_API void SP_Install();
 SPEEDPATCH_API void SP_Uninstall();
+SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID reserved);
 SPEEDPATCH_API BOOL SP_IsEnabled();
 SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId);
 SPEEDPATCH_API void SP_Enable(DWORD processId);
 SPEEDPATCH_API void SP_Disable(DWORD processId);
 SPEEDPATCH_API void SP_SetSpeed(double factor_);
 SPEEDPATCH_API double SP_GetSpeed();
-SPEEDPATCH_API void SP_Shutdown();
-SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam);
+SPEEDPATCH_API DWORD WINAPI SP_Shutdown(LPVOID reserved);
 }
 
 #endif // SPEEDPATCH_H

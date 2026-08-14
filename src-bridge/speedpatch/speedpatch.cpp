@@ -34,8 +34,44 @@ static volatile double factor = 1.0;
 
 static std::shared_mutex mutex;
 static std::atomic<double> pre_factor = 1.0;
+static std::atomic<LONG> initState = 0;
 static HANDLE hFileMap;
-static bool*  pEnabled;
+static LONG* pState;
+static DWORD installErrorCode;
+
+static constexpr LONG SP_STATE_INITIALIZING = 0x49;
+static constexpr LONG SP_STATE_DISABLED = 0x44;
+static constexpr LONG SP_STATE_ENABLED = 0x45;
+static constexpr LONG SP_STATE_FAILED = 0x46;
+
+static LONG SP_ReadState(volatile LONG* state)
+{
+    return InterlockedCompareExchange(state, 0, 0);
+}
+
+static void SP_WriteState(volatile LONG* state, LONG value)
+{
+    InterlockedExchange(state, value);
+}
+
+static bool SP_CompareAndSetState(volatile LONG* state, LONG expected, LONG value)
+{
+    return InterlockedCompareExchange(state, value, expected) == expected;
+}
+
+static constexpr DWORD SP_INIT_MINHOOK_ERROR = 0x01000000;
+static constexpr DWORD SP_INIT_HOOK_CREATE_ERROR = 0x02000000;
+static constexpr DWORD SP_INIT_HOOK_ENABLE_ERROR = 0x03000000;
+static constexpr DWORD SP_INIT_MAPPING_CREATE_ERROR = 0x04000000;
+static constexpr DWORD SP_INIT_MAPPING_VIEW_ERROR = 0x05000000;
+static constexpr DWORD SP_INIT_ROLLBACK_ERROR = 0x06000000;
+static constexpr DWORD SP_INIT_RESTART_REQUIRED = 0x07000000;
+
+static DWORD SP_EncodeMhError(DWORD kind, MH_STATUS status, DWORD hookId = 0)
+{
+    return kind | ((hookId & 0xff) << 16) |
+           (static_cast<DWORD>(status) & 0xffff);
+}
 
 // ── 诊断日志 ──────────────────────────────────────────────────────────────
 // 写入 DebugView (https://learn.microsoft.com/sysinternals/downloads/debugview)
@@ -180,19 +216,23 @@ SPEEDPATCH_API double SP_GetSpeed()
     return factor;
 }
 
-SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam)
-{
-    return CallNextHookEx(NULL, code, wParam, lParam);
-}
 void SP_Install()
 {
+    installErrorCode = ERROR_SUCCESS;
     DWORD processId = GetCurrentProcessId();
     std::wstring filemapName = GetProcessFileMapName(processId);
     SP_DbgLog(L"SP_Install: enter, filemap=%s", filemapName.c_str());
 
     SECURITY_DESCRIPTOR sd;
-    InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
-    SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
+    if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION) ||
+        !SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE))
+    {
+        DWORD err = GetLastError();
+        installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
+        SP_DbgLog(L"SP_Install: security descriptor setup FAILED err=%lu (0x%08lx)",
+                  err, err);
+        return;
+    }
     SECURITY_ATTRIBUTES sa;
     sa.nLength = sizeof(sa);
     sa.lpSecurityDescriptor = &sd;
@@ -203,71 +243,63 @@ void SP_Install()
         &sa,
         PAGE_READWRITE,
         0,
-        sizeof (bool),
+        sizeof(LONG),
         filemapName.c_str()
         );
     if (hFileMap == NULL)
     {
         DWORD err = GetLastError();
+        installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
         SP_DbgLog(L"SP_Install: CreateFileMapping FAILED err=%lu (0x%08lx) name=%s",
                   err, err, filemapName.c_str());
         return;
     }
-    pEnabled = (bool*) MapViewOfFile(
+    pState = static_cast<LONG*>(MapViewOfFile(
         hFileMap,
         FILE_MAP_ALL_ACCESS,
         0,
         0,
-        sizeof (bool)
-        );
-    if (pEnabled == NULL)
+        sizeof(LONG)
+        ));
+    if (pState == NULL)
     {
         DWORD err = GetLastError();
+        installErrorCode = SP_INIT_MAPPING_VIEW_ERROR | (err & 0x00ffffff);
         SP_DbgLog(L"SP_Install: MapViewOfFile FAILED err=%lu (0x%08lx)", err, err);
         CloseHandle(hFileMap);
         hFileMap = NULL;
         return;
     }
-    *pEnabled = true;
-    SP_DbgLog(L"SP_Install: OK, hFileMap=%p pEnabled=%p", hFileMap, (void*)pEnabled);
+    SP_WriteState(pState, SP_STATE_INITIALIZING);
+    SP_DbgLog(L"SP_Install: OK, hFileMap=%p pState=%p", hFileMap, (void*)pState);
 }
 
 void SP_Uninstall()
 {
     if (hFileMap != NULL)
     {
-        UnmapViewOfFile(pEnabled);
+        if (pState != nullptr)
+        {
+            UnmapViewOfFile(pState);
+        }
         CloseHandle(hFileMap);
+        pState = nullptr;
+        hFileMap = NULL;
     }
 }
-SPEEDPATCH_API void SP_Shutdown()
+SPEEDPATCH_API DWORD WINAPI SP_Shutdown(LPVOID)
 {
-    SP_DbgLog(L"SP_Shutdown: begin");
+    if (pState != nullptr && SP_ReadState(pState) != SP_STATE_FAILED)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex);
-        MH_DisableHook(MH_ALL_HOOKS);
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realSleep));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realSleepEx));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetWaitableTimer));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetWaitableTimerEx));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realSetTimer));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realTimeGetTime));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realTimeSetEvent));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetMessageTime));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetTickCount));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetTickCount64));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realQueryPerformanceCounter));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetSystemTimeAsFileTime));
-        MH_RemoveHook(reinterpret_cast<LPVOID>(realGetSystemTimePreciseAsFileTime));
-        MH_Uninitialize();
+        SP_WriteState(pState, SP_STATE_DISABLED);
     }
-    SP_Uninstall();
-    SP_DbgLog(L"SP_Shutdown: done");
+    SP_DbgLog(L"SP_Shutdown: live unload refused; hooks disabled logically only");
+    return ERROR_NOT_SUPPORTED;
 }
 
 BOOL SP_IsEnabled()
 {
-    return pEnabled ? *pEnabled : FALSE;
+    return pState != nullptr && SP_ReadState(pState) == SP_STATE_ENABLED;
 }
 
 SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId)
@@ -281,17 +313,17 @@ SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId)
     {
         return FALSE;
     }
-    bool* pStatus = (bool*) MapViewOfFile(hFileMap_,
-                                          FILE_MAP_READ,
-                                          0,
-                                          0,
-                                          sizeof (bool));
+    LONG* pStatus = static_cast<LONG*>(MapViewOfFile(hFileMap_,
+                                                     FILE_MAP_READ,
+                                                     0,
+                                                     0,
+                                                     sizeof(LONG)));
     if (pStatus == NULL)
     {
         CloseHandle(hFileMap_);
         return FALSE;
     }
-    BOOL enabled = (*pStatus) ? TRUE : FALSE;
+    BOOL enabled = SP_ReadState(pStatus) == SP_STATE_ENABLED;
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);
     return enabled;
@@ -308,17 +340,20 @@ void SP_Enable(DWORD processId)
     {
         return;
     }
-    bool* pStatus = (bool*) MapViewOfFile(hFileMap_,
-                                          FILE_MAP_ALL_ACCESS,
-                                          0,
-                                          0,
-                                          sizeof (bool));
+    LONG* pStatus = static_cast<LONG*>(MapViewOfFile(hFileMap_,
+                                                     FILE_MAP_ALL_ACCESS,
+                                                     0,
+                                                     0,
+                                                     sizeof(LONG)));
     if (pStatus == NULL)
     {
         CloseHandle(hFileMap_);
         return;
     }
-    *pStatus = true;
+    if (SP_ReadState(pStatus) != SP_STATE_FAILED)
+    {
+        SP_WriteState(pStatus, SP_STATE_ENABLED);
+    }
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);
 }
@@ -334,17 +369,20 @@ void SP_Disable(DWORD processId)
     {
         return;
     }
-    bool* pStatus = (bool*) MapViewOfFile(hFileMap_,
-                                          FILE_MAP_ALL_ACCESS,
-                                          0,
-                                          0,
-                                          sizeof (bool));
+    LONG* pStatus = static_cast<LONG*>(MapViewOfFile(hFileMap_,
+                                                     FILE_MAP_ALL_ACCESS,
+                                                     0,
+                                                     0,
+                                                     sizeof(LONG)));
     if (pStatus == NULL)
     {
         CloseHandle(hFileMap_);
         return;
     }
-    *pStatus = false;
+    if (SP_ReadState(pStatus) != SP_STATE_FAILED)
+    {
+        SP_WriteState(pStatus, SP_STATE_DISABLED);
+    }
     UnmapViewOfFile(pStatus);
     CloseHandle(hFileMap_);
 }
@@ -738,156 +776,185 @@ inline VOID shouldUpdateAll()
 }
 
 template <typename S, typename T>
-inline VOID MH_HOOK(S* pTarget, S* pDetour, T** ppOriginal)
+inline DWORD SP_CreateHook(DWORD hookId,
+                           const wchar_t* hookName,
+                           S* pTarget,
+                           S* pDetour,
+                           T** ppOriginal)
 {
-    MH_STATUS s1 = MH_CreateHook(reinterpret_cast<LPVOID> (pTarget),
-                                 reinterpret_cast<LPVOID> (pDetour),
-                                 reinterpret_cast<LPVOID*> (ppOriginal));
-    if (s1 != MH_OK)
+    MH_STATUS status = MH_CreateHook(reinterpret_cast<LPVOID>(pTarget),
+                                     reinterpret_cast<LPVOID>(pDetour),
+                                     reinterpret_cast<LPVOID*>(ppOriginal));
+    if (status != MH_OK)
     {
-        SP_DbgLog(L"MH_CreateHook target=%p FAILED status=%s",
-                  (void*)pTarget, SP_MhStatusName(s1));
+        SP_DbgLog(L"MH_CreateHook name=%s target=%p FAILED status=%s",
+                  hookName, (void*)pTarget, SP_MhStatusName(status));
+        return SP_EncodeMhError(SP_INIT_HOOK_CREATE_ERROR, status, hookId);
     }
-    MH_STATUS s2 = MH_EnableHook(reinterpret_cast<LPVOID> (pTarget));
-    if (s2 != MH_OK)
-    {
-        SP_DbgLog(L"MH_EnableHook target=%p FAILED status=%s",
-                  (void*)pTarget, SP_MhStatusName(s2));
-    }
+    return ERROR_SUCCESS;
 }
 
-template <typename T>
-VOID MH_UNHOOK(T* pTarget)
+SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
 {
-    MH_RemoveHook(reinterpret_cast<LPVOID> (pTarget));
-}
-
-BOOL APIENTRY DllMain(HMODULE hModule,
-                      DWORD   ul_reason_for_call,
-                      LPVOID  lpReserved)
-{
-    FILETIME now = { 0 };
-    switch (ul_reason_for_call)
+    LONG expected = 0;
+    if (!initState.compare_exchange_strong(expected, 1))
     {
-    case DLL_PROCESS_ATTACH:
+        if (expected == 2)
+            return ERROR_SUCCESS;
+        if (expected == 3)
+            return SP_INIT_RESTART_REQUIRED;
+        return ERROR_BUSY;
+    }
 
-        SP_DbgLog(L"DllMain: DLL_PROCESS_ATTACH, hModule=%p", (void*)hModule);
+    SP_DbgLog(L"SP_Initialize: begin");
+    MH_STATUS status = MH_Initialize();
+    SP_DbgLog(L"SP_Initialize: MH_Initialize status=%s", SP_MhStatusName(status));
+    if (status != MH_OK)
+    {
+        initState.store(0);
+        return SP_EncodeMhError(SP_INIT_MINHOOK_ERROR, status);
+    }
+
+    // Publish INITIALIZING before any potentially slow hook work. The bridge
+    // can distinguish this from DISABLED and can cancel enablement on shutdown.
+    SP_Install();
+    if (pState == nullptr)
+    {
+        MH_STATUS rollback = MH_Uninitialize();
+        if (rollback != MH_OK)
         {
-            MH_STATUS status = MH_Initialize();
-            SP_DbgLog(L"DllMain: MH_Initialize status=%s", SP_MhStatusName(status));
-            if (status != MH_OK && status != MH_ERROR_ALREADY_INITIALIZED)
-            {
-                // 不再 return FALSE 让 Windows 卸载 DLL — 否则主程序侧完全没有线索
-                // 创建 FileMapping 后 return FALSE，main 端能从 STATUS 看到 "loaded but unhealthy"
-                SP_DbgLog(L"DllMain: MH_Initialize fatal — still creating FileMapping for diagnostics");
-                SP_Install();
-                SP_DbgLog(L"DllMain: ABORT after SP_Install (MH_Initialize fatal)");
-                return FALSE;
-            }
+            initState.store(3);
+            return SP_EncodeMhError(SP_INIT_ROLLBACK_ERROR, rollback);
         }
-        SP_Install();
-        /* Initial timeGetTime */
-        baselineKernelTimeGetTime = timeGetTime();
-        prevcallKernelTimeGetTime = baselineKernelTimeGetTime;
-        baselineDetourTimeGetTime = baselineKernelTimeGetTime;
-        prevcallDetourTimeGetTime = baselineKernelTimeGetTime;
-
-        baselineKernelGetMessageTime = GetMessageTime();
-        prevcallKernelGetMessageTime = baselineKernelGetMessageTime;
-        baselineDetourGetMessageTime = baselineKernelGetMessageTime;
-        prevcallDetourGetMessageTime = baselineKernelGetMessageTime;
-
-        /* Initial GetTickCount */
-        baselineKernelGetTickCount = GetTickCount();
-        prevcallKernelGetTickCount = baselineKernelGetTickCount;
-        baselineDetourGetTickCount = baselineKernelGetTickCount;
-        prevcallDetourGetTickCount = baselineKernelGetTickCount;
-
-        baselineKernelGetTickCount64 = GetTickCount64();
-        prevcallKernelGetTickCount64 = baselineKernelGetTickCount64;
-        baselineDetourGetTickCount64 = baselineKernelGetTickCount64;
-        prevcallDetourGetTickCount64 = baselineKernelGetTickCount64;
-
-        /* Initial QueryPerformanceCounter */
-        QueryPerformanceCounter(&baselineKernelQueryPerformanceCounter);
-        prevcallKernelQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
-        baselineDetourQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
-        prevcallDetourQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
-
-        /* Initial QueryPerformanceFrequency */
-        QueryPerformanceFrequency(&baselineKernelQueryPerformanceFrequency);
-
-        /* Initial GetSystemTimeAsFileTime */
-        GetSystemTimeAsFileTime(&now);
-        baselineKernelGetSystemTimeAsFileTime.store(now);
-        prevcallKernelGetSystemTimeAsFileTime.store(now);
-        baselineDetourGetSystemTimeAsFileTime.store(now);
-        prevcallDetourGetSystemTimeAsFileTime.store(now);
-
-        /* Initial GetSystemTimePreciseAsFileTime */
-        GetSystemTimePreciseAsFileTime(&now);
-        baselineKernelGetSystemTimePreciseAsFileTime.store(now);
-        prevcallKernelGetSystemTimePreciseAsFileTime.store(now);
-        baselineDetourGetSystemTimePreciseAsFileTime.store(now);
-        prevcallDetourGetSystemTimePreciseAsFileTime.store(now);
-
-        MH_HOOK(&Sleep,
-                &DetourSleep,
-                reinterpret_cast<LPVOID*> (&realSleep));
-        MH_HOOK(&SleepEx,
-                &DetourSleepEx,
-                reinterpret_cast<LPVOID*>(&realSleepEx));
-
-        MH_HOOK(&SetWaitableTimer,
-                &DetourSetWaitableTimer,
-                reinterpret_cast<LPVOID*>(&realSetWaitableTimer));
-
-        MH_HOOK(&SetWaitableTimerEx,
-                &DetourSetWaitableTimerEx,
-                reinterpret_cast<LPVOID*>(&realSetWaitableTimerEx));
-        MH_HOOK(&SetTimer,
-                &DetourSetTimer,
-                reinterpret_cast<LPVOID*> (&realSetTimer));
-        MH_HOOK(&timeGetTime,
-                &DetourTimeGetTime,
-                reinterpret_cast<LPVOID*> (&realTimeGetTime));
-        MH_HOOK(&timeSetEvent,
-                &DetourTimeSetEvent,
-                reinterpret_cast<LPVOID*>(&realTimeSetEvent));
-        MH_HOOK(&GetMessageTime,
-                &DetourGetMessageTime,
-                reinterpret_cast<LPVOID*>(&realGetMessageTime));
-        MH_HOOK(&GetTickCount,
-                &DetourGetTickCount,
-                reinterpret_cast<LPVOID*> (&realGetTickCount));
-        MH_HOOK(&GetTickCount64,
-                &DetourGetTickCount64,
-                reinterpret_cast<LPVOID*> (&realGetTickCount64));
-        MH_HOOK(&QueryPerformanceCounter,
-                &DetourQueryPerformanceCounter,
-                reinterpret_cast<LPVOID*> (&realQueryPerformanceCounter));
-        MH_HOOK(&GetSystemTimeAsFileTime,
-                &DetourGetSystemTimeAsFileTime,
-                reinterpret_cast<LPVOID*> (&realGetSystemTimeAsFileTime));
-        MH_HOOK(&GetSystemTimePreciseAsFileTime,
-                &DetourGetSystemTimePreciseAsFileTime,
-                reinterpret_cast<LPVOID*> (
-                    &realGetSystemTimePreciseAsFileTime));
-
-        SP_DbgLog(L"DllMain: all hooks installed");
-
-        break;
-    case DLL_THREAD_ATTACH:
-        break;
-    case DLL_THREAD_DETACH:
-        break;
-    case DLL_PROCESS_DETACH:
-    {
-        // Do not call MinHook, take locks, or sleep under the loader lock.
-        // Full hook cleanup is done by SP_Shutdown during explicit EJECT.
-        SP_Uninstall();
-        break;
+        initState.store(0);
+        SP_DbgLog(L"SP_Initialize: shared mapping initialization failed");
+        return installErrorCode != ERROR_SUCCESS
+                   ? installErrorCode
+                   : (SP_INIT_MAPPING_CREATE_ERROR | ERROR_GEN_FAILURE);
     }
+
+    FILETIME now = { 0 };
+    baselineKernelTimeGetTime = timeGetTime();
+    prevcallKernelTimeGetTime = baselineKernelTimeGetTime;
+    baselineDetourTimeGetTime = baselineKernelTimeGetTime;
+    prevcallDetourTimeGetTime = baselineKernelTimeGetTime;
+
+    baselineKernelGetMessageTime = GetMessageTime();
+    prevcallKernelGetMessageTime = baselineKernelGetMessageTime;
+    baselineDetourGetMessageTime = baselineKernelGetMessageTime;
+    prevcallDetourGetMessageTime = baselineKernelGetMessageTime;
+
+    baselineKernelGetTickCount = GetTickCount();
+    prevcallKernelGetTickCount = baselineKernelGetTickCount;
+    baselineDetourGetTickCount = baselineKernelGetTickCount;
+    prevcallDetourGetTickCount = baselineKernelGetTickCount;
+
+    baselineKernelGetTickCount64 = GetTickCount64();
+    prevcallKernelGetTickCount64 = baselineKernelGetTickCount64;
+    baselineDetourGetTickCount64 = baselineKernelGetTickCount64;
+    prevcallDetourGetTickCount64 = baselineKernelGetTickCount64;
+
+    QueryPerformanceCounter(&baselineKernelQueryPerformanceCounter);
+    prevcallKernelQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
+    baselineDetourQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
+    prevcallDetourQueryPerformanceCounter = baselineKernelQueryPerformanceCounter;
+    QueryPerformanceFrequency(&baselineKernelQueryPerformanceFrequency);
+
+    GetSystemTimeAsFileTime(&now);
+    baselineKernelGetSystemTimeAsFileTime.store(now);
+    prevcallKernelGetSystemTimeAsFileTime.store(now);
+    baselineDetourGetSystemTimeAsFileTime.store(now);
+    prevcallDetourGetSystemTimeAsFileTime.store(now);
+
+    GetSystemTimePreciseAsFileTime(&now);
+    baselineKernelGetSystemTimePreciseAsFileTime.store(now);
+    prevcallKernelGetSystemTimePreciseAsFileTime.store(now);
+    baselineDetourGetSystemTimePreciseAsFileTime.store(now);
+    prevcallDetourGetSystemTimePreciseAsFileTime.store(now);
+
+    DWORD hookError = SP_CreateHook(1, L"Sleep", &Sleep, &DetourSleep, &realSleep);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(2, L"SleepEx", &SleepEx, &DetourSleepEx, &realSleepEx);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(3, L"SetWaitableTimer", &SetWaitableTimer,
+                                  &DetourSetWaitableTimer, &realSetWaitableTimer);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(4, L"SetWaitableTimerEx", &SetWaitableTimerEx,
+                                  &DetourSetWaitableTimerEx, &realSetWaitableTimerEx);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(5, L"SetTimer", &SetTimer, &DetourSetTimer, &realSetTimer);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(6, L"timeGetTime", &timeGetTime,
+                                  &DetourTimeGetTime, &realTimeGetTime);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(7, L"timeSetEvent", &timeSetEvent,
+                                  &DetourTimeSetEvent, &realTimeSetEvent);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(8, L"GetMessageTime", &GetMessageTime,
+                                  &DetourGetMessageTime, &realGetMessageTime);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(9, L"GetTickCount", &GetTickCount,
+                                  &DetourGetTickCount, &realGetTickCount);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(10, L"GetTickCount64", &GetTickCount64,
+                                  &DetourGetTickCount64, &realGetTickCount64);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(11, L"QueryPerformanceCounter", &QueryPerformanceCounter,
+                                  &DetourQueryPerformanceCounter, &realQueryPerformanceCounter);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(12, L"GetSystemTimeAsFileTime", &GetSystemTimeAsFileTime,
+                                  &DetourGetSystemTimeAsFileTime,
+                                  &realGetSystemTimeAsFileTime);
+    if (hookError == ERROR_SUCCESS)
+        hookError = SP_CreateHook(13, L"GetSystemTimePreciseAsFileTime",
+                                  &GetSystemTimePreciseAsFileTime,
+                                  &DetourGetSystemTimePreciseAsFileTime,
+                                  &realGetSystemTimePreciseAsFileTime);
+
+    if (hookError != ERROR_SUCCESS)
+    {
+        SP_Uninstall();
+        MH_STATUS rollback = MH_Uninitialize();
+        if (rollback != MH_OK)
+        {
+            initState.store(3);
+            return SP_EncodeMhError(SP_INIT_ROLLBACK_ERROR, rollback);
+        }
+        initState.store(0);
+        return hookError;
+    }
+
+    status = MH_EnableHook(MH_ALL_HOOKS);
+    if (status != MH_OK)
+    {
+        MH_STATUS disableStatus = MH_DisableHook(MH_ALL_HOOKS);
+        // Some hooks may have become active before MinHook reported the
+        // failure. Keep the DLL and status mapping resident, and make the
+        // failure non-retryable until the target process is restarted.
+        SP_WriteState(pState, SP_STATE_FAILED);
+        initState.store(3);
+        SP_DbgLog(L"SP_Initialize: MH_EnableHook(MH_ALL_HOOKS) FAILED status=%s rollback=%s",
+                  SP_MhStatusName(status), SP_MhStatusName(disableStatus));
+        if (disableStatus != MH_OK && disableStatus != MH_ERROR_DISABLED)
+        {
+            return SP_EncodeMhError(SP_INIT_ROLLBACK_ERROR, disableStatus);
+        }
+        // Keep MinHook's disabled trampolines allocated. A thread may already
+        // have entered a detour before rollback; unloading in that state is unsafe.
+        return SP_EncodeMhError(SP_INIT_HOOK_ENABLE_ERROR, status);
+    }
+
+    SP_CompareAndSetState(pState, SP_STATE_INITIALIZING, SP_STATE_ENABLED);
+    initState.store(2);
+    SP_DbgLog(L"SP_Initialize: all hooks installed");
+    return ERROR_SUCCESS;
+}
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
+{
+    if (reason == DLL_PROCESS_ATTACH)
+    {
+        DisableThreadLibraryCalls(hModule);
     }
     return TRUE;
 }

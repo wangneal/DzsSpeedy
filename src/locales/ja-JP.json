@@ -34,6 +34,7 @@
     "injectFail": "注入に失敗しました",
     "enableFail": "加速の有効化に失敗しました",
     "disableFail": "加速の無効化に失敗しました",
+    "statusFail": "注入状態の確認に失敗しました",
     "detail": {
       "title": "プロセス詳細",
       "pid": "プロセス ID",
@@ -48,7 +49,10 @@
       "statusInjected": "注入済み",
       "statusEnabled": "加速有効",
       "statusDisabled": "加速無効",
+      "statusInitializing": "初期化中",
+      "statusFailed": "注入失敗",
       "statusNotInjected": "未注入",
+      "lastError": "最新のエラー",
       "noSelection": "左側のリストからプロセスを選択してください",
       "yes": "はい",
       "no": "いいえ",

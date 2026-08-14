@@ -38,6 +38,7 @@
     "injectFail": "注入失败",
     "enableFail": "启用加速失败",
     "disableFail": "禁用加速失败",
+    "statusFail": "查询注入状态失败",
     "detail": {
       "title": "进程详情",
       "pid": "进程 ID",
@@ -52,7 +53,10 @@
       "statusInjected": "已注入",
       "statusEnabled": "加速已启用",
       "statusDisabled": "加速已禁用",
+      "statusInitializing": "正在初始化",
+      "statusFailed": "注入失败",
       "statusNotInjected": "未注入",
+      "lastError": "详细错误",
       "noSelection": "请在左侧列表中选择一个进程查看详情",
       "yes": "是",
       "no": "否",

@@ -6,6 +6,7 @@ use process_enumerator::ModuleInfo;
 use process_enumerator::ProcessInfo;
 use std::process::Child;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 static BRIDGE_CHILDREN: Mutex<Vec<Child>> = Mutex::new(Vec::new());
 
@@ -37,13 +38,29 @@ fn ensure_bridges() {
 }
 
 fn shutdown_bridges() {
-    // Ask bridges to exit, but do not kill them. A 32-bit SetWindowsHookEx injection
-    // must keep the installing bridge alive; force-killing it unloads the hook DLL
-    // inside the target process during app shutdown and can hang the target.
+    // Wake the bridge shutdown threads even if their pipe servers are blocked.
     bridge_client::bridge64_shutdown();
     bridge_client::bridge32_shutdown();
 
     if let Ok(mut children) = BRIDGE_CHILDREN.lock() {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let mut all_exited = true;
+            for child in children.iter_mut() {
+                match child.try_wait() {
+                    Ok(Some(_)) => {}
+                    Ok(None) | Err(_) => all_exited = false,
+                }
+            }
+            if all_exited || Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+
+        // Do not force-kill a bridge that is draining a remote LoadLibraryW or
+        // SP_Initialize thread. The bridge has its own bounded shutdown grace
+        // period and will disable a target again when a pending injection ends.
         children.clear();
     }
 }
@@ -121,14 +138,12 @@ async fn bridge_disable(pid: u32, arch: String) -> Result<(), String> {
     }
 }
 
-/// Query bridge for per-PID status.
-/// Returns Some(true) = enabled, Some(false) = injected but disabled, None = not injected.
 #[tauri::command(async)]
-async fn bridge_get_status(pid: u32, arch: String) -> Option<bool> {
+async fn bridge_get_status(pid: u32, arch: String) -> Result<bridge_client::BridgeStatus, String> {
     match arch.as_str() {
         "x86" => bridge_client::bridge32_get_status(pid),
         "x64" => bridge_client::bridge64_get_status(pid),
-        _ => None,
+        _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
 

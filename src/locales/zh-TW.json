@@ -34,6 +34,7 @@
     "injectFail": "注入失敗",
     "enableFail": "啟用加速失敗",
     "disableFail": "停用加速失敗",
+    "statusFail": "查詢注入狀態失敗",
     "detail": {
       "title": "程序詳情",
       "pid": "程序 ID",
@@ -48,7 +49,10 @@
       "statusInjected": "已注入",
       "statusEnabled": "加速已啟用",
       "statusDisabled": "加速已停用",
+      "statusInitializing": "正在初始化",
+      "statusFailed": "注入失敗",
       "statusNotInjected": "未注入",
+      "lastError": "詳細錯誤",
       "noSelection": "請在左側列表中選擇一個程序查看詳情",
       "yes": "是",
       "no": "否",

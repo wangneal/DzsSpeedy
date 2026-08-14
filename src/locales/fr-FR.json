@@ -38,6 +38,7 @@
     "injectFail": "Échec de l'injection",
     "enableFail": "Échec de l'activation",
     "disableFail": "Échec de la désactivation",
+    "statusFail": "Échec de la vérification de l'état d'injection",
     "detail": {
       "title": "Détails du Processus",
       "pid": "ID du Processus",
@@ -52,7 +53,10 @@
       "statusInjected": "Injecté",
       "statusEnabled": "Activé",
       "statusDisabled": "Désactivé",
+      "statusInitializing": "Initialisation",
+      "statusFailed": "Échec de l'injection",
       "statusNotInjected": "Non Injecté",
+      "lastError": "Dernière erreur",
       "noSelection": "Sélectionnez un processus dans la liste pour voir les détails",
       "yes": "Oui",
       "no": "Non",

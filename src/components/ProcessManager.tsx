@@ -7,10 +7,12 @@ import { Splitter } from "antd";
 import {
   Box, Paper, Typography, Avatar, Switch, TextField,
   Divider, Table, TableCell, TableHead, TableRow, Chip,
+  CircularProgress, IconButton, Tooltip,
 } from "@mui/material";
 import WindowIcon from "@mui/icons-material/Window";
 import SearchIcon from "@mui/icons-material/Search";
 import MemoryIcon from "@mui/icons-material/Memory";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import SpeedPanel from "./SpeedPanel";
 import ProcessDetail from "./ProcessDetail";
 import { useSettings, useSpeed } from "../hooks/useSettings";
@@ -28,6 +30,15 @@ interface ProcessInfo {
   admin: boolean;
 }
 
+type SpeedPhase = "initializing" | "enabled" | "disabled" | "failed";
+
+interface SpeedState {
+  injected: boolean;
+  arch: string;
+  phase: SpeedPhase;
+  error?: string;
+}
+
 const ROW_H = 42;
 const COL = { pid: 72, check: 60 } as const;
 
@@ -43,6 +54,13 @@ function bridgeErrorMessage(error: unknown): string {
   } catch {
     return String(error);
   }
+}
+
+const INJECTION_PENDING_MARKER = "INJECTION_PENDING:";
+const BRIDGE_OUTCOME_UNKNOWN_MARKER = "BRIDGE_OUTCOME_UNKNOWN:";
+
+function bridgeOutcomeNeedsStatus(error: string): boolean {
+  return error.includes(INJECTION_PENDING_MARKER) || error.includes(BRIDGE_OUTCOME_UNKNOWN_MARKER);
 }
 
 async function invokeBridgeCommand(command: string, args: Record<string, unknown>): Promise<string | null> {
@@ -69,12 +87,16 @@ function ProcessIcon({ pid, icons }: { pid: number; icons: Record<number, string
 // ── Memoized process table (isolated from speed state) ───────────────────
 
 const ProcessRow = React.memo(function ProcessRow({
-  p, on, icons, start, selected, onToggle, onSelect,
+  p, speedState, icons, start, selected, onToggle, onSelect,
 }: {
-  p: ProcessInfo; on: boolean; icons: Record<number, string>; start: number; selected: boolean;
+  p: ProcessInfo; speedState?: SpeedState; icons: Record<number, string>; start: number; selected: boolean;
   onToggle: (pid: number, arch: string) => void;
   onSelect: (pid: number) => void;
 }) {
+  const on = speedState?.phase === "enabled";
+  const initializing = speedState?.phase === "initializing";
+  const failed = speedState?.phase === "failed";
+
   return (
     <Box
       onClick={() => onSelect(p.pid)}
@@ -94,27 +116,44 @@ const ProcessRow = React.memo(function ProcessRow({
           {p.window_title && <Typography variant="caption" noWrap sx={{ color: "text.disabled", display: "block", lineHeight: 1.2 }}>{p.window_title}</Typography>}
         </Box>
       </Box>
-      <Box sx={{ textAlign: "center" }}><Switch size="small" checked={on} onChange={() => onToggle(p.pid, p.arch)} /></Box>
+      <Box sx={{ height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {initializing ? (
+          <CircularProgress size={18} thickness={5} />
+        ) : failed ? (
+          <Tooltip title={speedState?.error ?? ""}>
+            <IconButton
+              size="small"
+              color="error"
+              onClick={event => { event.stopPropagation(); onToggle(p.pid, p.arch); }}
+            >
+              <ErrorOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Switch size="small" checked={on} onChange={() => onToggle(p.pid, p.arch)} />
+        )}
+      </Box>
     </Box>
   );
 }, (prev, next) =>
   prev.p.pid === next.p.pid &&
   prev.p.name === next.p.name &&
   prev.p.arch === next.p.arch &&
-  prev.on === next.on &&
+  prev.speedState?.phase === next.speedState?.phase &&
+  prev.speedState?.error === next.speedState?.error &&
   prev.start === next.start &&
   prev.selected === next.selected
 );
 
 const ProcessTable = function ProcessTable({
-  processes, filtered, search, onSearch, icons, enabled, selectedPid, onToggle, onSelect,
+  processes, filtered, search, onSearch, icons, speedStates, selectedPid, onToggle, onSelect,
 }: {
   processes: ProcessInfo[];
   filtered: ProcessInfo[];
   search: string;
   onSearch: (v: string) => void;
   icons: Record<number, string>;
-  enabled: Set<number>;
+  speedStates: Map<number, SpeedState>;
   selectedPid: number | null;
   onToggle: (pid: number, arch: string) => void;
   onSelect: (pid: number) => void;
@@ -157,7 +196,7 @@ const ProcessTable = function ProcessTable({
         <Box ref={scrollRef} sx={{ flex: 1, overflow: "auto", position: "relative" }}>
           <div style={{ height: vz.getTotalSize(), width: 1 }} />
           {vz.getVirtualItems().map(vr => (
-            <ProcessRow key={filtered[vr.index].pid} p={filtered[vr.index]} on={enabled.has(filtered[vr.index].pid)} icons={icons} start={vr.start} selected={selectedPid === filtered[vr.index].pid} onToggle={onToggle} onSelect={onSelect} />
+            <ProcessRow key={filtered[vr.index].pid} p={filtered[vr.index]} speedState={speedStates.get(filtered[vr.index].pid)} icons={icons} start={vr.start} selected={selectedPid === filtered[vr.index].pid} onToggle={onToggle} onSelect={onSelect} />
           ))}
           {filtered.length === 0 && (
             <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
@@ -173,10 +212,56 @@ const ProcessTable = function ProcessTable({
 
 // ── Component ────────────────────────────────────────────────────────────
 
-interface SpeedState {
-  injected: boolean;
-  enabled: boolean;
-  arch: string;
+type BridgeStatus =
+  | { state: "enabled" | "disabled" | "initializing" | "not_injected" }
+  | { state: "failed"; detail: string };
+
+function reconcileBridgeStatus(
+  states: Map<number, SpeedState>,
+  pid: number,
+  arch: string,
+  status: BridgeStatus,
+): Map<number, SpeedState> {
+  const current = states.get(pid);
+  if (status.state === "not_injected") {
+    if (!current) return states;
+    const next = new Map(states);
+    next.delete(pid);
+    return next;
+  }
+
+  if (status.state === "initializing") {
+    if (current?.phase === "initializing" && current.arch === arch) return states;
+    const next = new Map(states);
+    next.set(pid, { injected: false, arch, phase: "initializing" });
+    return next;
+  }
+
+  if (status.state === "failed") {
+    if (current?.phase === "failed" && current.error === status.detail && current.arch === arch) {
+      return states;
+    }
+    const next = new Map(states);
+    next.set(pid, {
+      injected: false,
+      arch,
+      phase: "failed",
+      error: status.detail,
+    });
+    return next;
+  }
+
+  const enabled = status.state === "enabled";
+  const phase = enabled ? "enabled" : "disabled";
+  if (
+    current?.injected &&
+    current.arch === arch &&
+    current.phase === phase &&
+    !current.error
+  ) return states;
+  const next = new Map(states);
+  next.set(pid, { injected: true, arch, phase });
+  return next;
 }
 
 export default function ProcessManager() {
@@ -189,53 +274,141 @@ export default function ProcessManager() {
   const { speed, setSpeed, commitSpeed } = useSpeed();
   const { notify } = useSnackbar();
   const { t } = useTranslation();
+  const speedMapRef = useRef(speedMap);
+  const bridgeCommandPidsRef = useRef(new Set<number>());
+  const bridgeOperationVersionRef = useRef(new Map<number, number>());
+  const statusPollInFlightRef = useRef(false);
+  const statusErrorRef = useRef(new Map<number, { detail: string; shownAt: number }>());
+
+  function updateSpeedMap(updater: (current: Map<number, SpeedState>) => Map<number, SpeedState>) {
+    const next = updater(speedMapRef.current);
+    if (next === speedMapRef.current) return;
+    speedMapRef.current = next;
+    setSpeedMap(next);
+  }
+
+  function beginBridgeOperation(pid: number) {
+    const version = (bridgeOperationVersionRef.current.get(pid) ?? 0) + 1;
+    bridgeOperationVersionRef.current.set(pid, version);
+    return version;
+  }
+
+  function reportStatusError(pid: number, error: unknown) {
+    const detail = bridgeErrorMessage(error);
+    console.error(`[status] bridge_get_status failed for pid ${pid}:`, detail);
+
+    const now = Date.now();
+    const previous = statusErrorRef.current.get(pid);
+    if (previous?.detail === detail && now - previous.shownAt < 30_000) return;
+    statusErrorRef.current.set(pid, { detail, shownAt: now });
+    notify(`${t("process.statusFail")}: ${detail}`, "error", 10000);
+  }
+
+  function applyBridgeStatus(pid: number, arch: string, status: BridgeStatus) {
+    if (status.state === "failed") {
+      const previous = statusErrorRef.current.get(pid);
+      if (previous?.detail !== status.detail) {
+        statusErrorRef.current.set(pid, { detail: status.detail, shownAt: Date.now() });
+        notify(`${t("process.injectFail")}: ${status.detail}`, "error", 10000);
+      }
+    } else {
+      statusErrorRef.current.delete(pid);
+    }
+    updateSpeedMap(current => reconcileBridgeStatus(current, pid, arch, status));
+  }
 
   const gears = useMemo(() => settings
     ? [1, 2, 3, 4, 5].map(i => (settings[`gear${i}Speed` as keyof typeof settings] as number) || 1)
     : [1, 2, 5, 10, 100],
   [settings]);
 
-  // Derive enabled set for UI
-  const enabled = useMemo(() => {
-    const s = new Set<number>();
-    for (const [pid, st] of speedMap) { if (st.enabled) s.add(pid); }
-    return s;
-  }, [speedMap]);
-
   // Toggle — optimistic update with rollback on failure
   async function toggle(pid: number, arch: string) {
-    const cur = speedMap.get(pid);
-    const wasOn = cur?.enabled ?? false;
-    const wasInjected = cur?.injected ?? false;
+    if (bridgeCommandPidsRef.current.has(pid)) return;
+    bridgeCommandPidsRef.current.add(pid);
+    beginBridgeOperation(pid);
 
-    if (!wasOn) {
-      // Turning ON
-      if (!wasInjected) {
-        // First time inject
-        setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { injected: true, enabled: true, arch }); return n; });
-        const error = await invokeBridgeCommand("bridge_inject", { pid, arch });
-        console.log("[toggle] bridge_inject result:", error ?? "OK");
-        if (error) {
-          setSpeedMap(prev => { const n = new Map(prev); n.delete(pid); return n; });
-          notify(`${t("process.injectFail")}: ${error}`, "error", 10000);
+    const cur = speedMapRef.current.get(pid);
+    const wasOn = cur?.phase === "enabled";
+    const wasInjected = cur?.phase !== "failed" && (cur?.injected ?? false);
+
+    try {
+      if (!wasOn) {
+        // Turning ON
+        if (!wasInjected) {
+          updateSpeedMap(prev => {
+            const next = new Map(prev);
+            next.set(pid, { injected: false, arch, phase: "initializing" });
+            return next;
+          });
+          const error = await invokeBridgeCommand("bridge_inject", { pid, arch });
+          console.log("[toggle] bridge_inject result:", error ?? "OK");
+          if (error) {
+            if (bridgeOutcomeNeedsStatus(error)) {
+              notify(error, "warning", 10000);
+            } else {
+              updateSpeedMap(prev => {
+                const next = new Map(prev);
+                next.set(pid, {
+                  injected: false,
+                  arch,
+                  phase: "failed",
+                  error,
+                });
+                return next;
+              });
+              notify(`${t("process.injectFail")}: ${error}`, "error", 10000);
+            }
+          } else {
+            updateSpeedMap(prev => reconcileBridgeStatus(prev, pid, arch, { state: "enabled" }));
+          }
+        } else {
+          updateSpeedMap(prev => {
+            const next = new Map(prev);
+            next.set(pid, { ...cur!, phase: "enabled", error: undefined });
+            return next;
+          });
+          const error = await invokeBridgeCommand("bridge_enable", { pid, arch });
+          if (error) {
+            if (bridgeOutcomeNeedsStatus(error)) {
+              notify(error, "warning", 10000);
+            } else {
+              updateSpeedMap(prev => {
+                const next = new Map(prev);
+                next.set(pid, cur!);
+                return next;
+              });
+              notify(`${t("process.enableFail")}: ${error}`, "error", 10000);
+            }
+          } else {
+            updateSpeedMap(prev => reconcileBridgeStatus(prev, pid, arch, { state: "enabled" }));
+          }
         }
       } else {
-        // Already injected — re-enable
-        setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { ...cur!, enabled: true }); return n; });
-        const error = await invokeBridgeCommand("bridge_enable", { pid, arch });
+        // Turning OFF
+        updateSpeedMap(prev => {
+          const next = new Map(prev);
+          next.set(pid, { ...cur!, phase: "disabled", error: undefined });
+          return next;
+        });
+        const error = await invokeBridgeCommand("bridge_disable", { pid, arch });
         if (error) {
-          setSpeedMap(prev => { const n = new Map(prev); n.set(pid, cur!); return n; });
-          notify(`${t("process.enableFail")}: ${error}`, "error", 10000);
+          if (bridgeOutcomeNeedsStatus(error)) {
+            notify(error, "warning", 10000);
+          } else {
+            updateSpeedMap(prev => {
+              const next = new Map(prev);
+              next.set(pid, cur!);
+              return next;
+            });
+            notify(`${t("process.disableFail")}: ${error}`, "error", 10000);
+          }
+        } else {
+          updateSpeedMap(prev => reconcileBridgeStatus(prev, pid, arch, { state: "disabled" }));
         }
       }
-    } else {
-      // Turning OFF
-      setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { ...cur!, enabled: false }); return n; });
-      const error = await invokeBridgeCommand("bridge_disable", { pid, arch });
-      if (error) {
-        setSpeedMap(prev => { const n = new Map(prev); n.set(pid, cur!); return n; });
-        notify(`${t("process.disableFail")}: ${error}`, "error", 10000);
-      }
+    } finally {
+      bridgeCommandPidsRef.current.delete(pid);
     }
   }
 
@@ -267,64 +440,72 @@ export default function ProcessManager() {
 
   // Query real injection status from bridge periodically for all tracked processes
   useInterval(async () => {
-    if (speedMap.size === 0) return;
-    const nextMap = new Map(speedMap);
-    let changed = false;
+    if (statusPollInFlightRef.current || bridgeCommandPidsRef.current.size > 0) return;
+    const snapshot = [...speedMapRef.current.entries()]
+      .filter(([, state]) => state.phase !== "failed")
+      .map(([pid, state]) => ({
+        pid,
+        state,
+        version: bridgeOperationVersionRef.current.get(pid) ?? 0,
+      }));
+    if (snapshot.length === 0) return;
 
-    for (const [pid, st] of speedMap) {
-      try {
-        const status = await invoke<boolean | null>("bridge_get_status", { pid, arch: st.arch });
-        if (status === true) {
-          if (!st.injected || !st.enabled) {
-            nextMap.set(pid, { injected: true, enabled: true, arch: st.arch });
-            changed = true;
+    statusPollInFlightRef.current = true;
+    try {
+      for (const { pid, state, version } of snapshot) {
+        // The bridge has one command executor. Do not queue STATUS behind a
+        // potentially long injection, and ignore a result that raced a toggle.
+        if (bridgeCommandPidsRef.current.size > 0) break;
+        try {
+          const status = await invoke<BridgeStatus>("bridge_get_status", { pid, arch: state.arch });
+          if (
+            bridgeCommandPidsRef.current.has(pid) ||
+            (bridgeOperationVersionRef.current.get(pid) ?? 0) !== version
+          ) continue;
+          const latest = speedMapRef.current.get(pid);
+          if (!latest || latest.arch !== state.arch) continue;
+          applyBridgeStatus(pid, state.arch, status);
+        } catch (error) {
+          if (
+            !bridgeCommandPidsRef.current.has(pid) &&
+            (bridgeOperationVersionRef.current.get(pid) ?? 0) === version
+          ) {
+            reportStatusError(pid, error);
           }
-        } else if (status === false) {
-          if (!st.injected || st.enabled) {
-            nextMap.set(pid, { injected: true, enabled: false, arch: st.arch });
-            changed = true;
-          }
-        } else {
-          // Not injected (status === null) or offline — if we previously thought it was injected, clean up state
-          if (st.injected) {
-            nextMap.delete(pid);
-            changed = true;
-          }
-        }
-      } catch {
-        // If query fails, assume offline / not injected
-        if (st.injected) {
-          nextMap.delete(pid);
-          changed = true;
         }
       }
-    }
-    if (changed) {
-      setSpeedMap(nextMap);
+    } finally {
+      statusPollInFlightRef.current = false;
     }
   }, 2000);
 
   // Instantly query status when selecting a new process
   useEffect(() => {
     const p = selectedProcess;
-    if (!p) return;
-    invoke<boolean | null>("bridge_get_status", { pid: p.pid, arch: p.arch })
+    if (
+      !p ||
+      bridgeCommandPidsRef.current.has(p.pid) ||
+      speedMapRef.current.get(p.pid)?.phase === "failed"
+    ) return;
+    let cancelled = false;
+    const version = bridgeOperationVersionRef.current.get(p.pid) ?? 0;
+    invoke<BridgeStatus>("bridge_get_status", { pid: p.pid, arch: p.arch })
       .then(status => {
-        if (status === true) {
-          setSpeedMap(prev => { const n = new Map(prev); n.set(p.pid, { injected: true, enabled: true, arch: p.arch }); return n; });
-        } else if (status === false) {
-          setSpeedMap(prev => { const n = new Map(prev); n.set(p.pid, { injected: true, enabled: false, arch: p.arch }); return n; });
-        } else {
-          // If bridge tells us it is not injected, clear any stale state
-          setSpeedMap(prev => {
-            if (!prev.has(p.pid)) return prev;
-            const n = new Map(prev);
-            n.delete(p.pid);
-            return n;
-          });
-        }
+        if (
+          cancelled ||
+          bridgeCommandPidsRef.current.has(p.pid) ||
+          (bridgeOperationVersionRef.current.get(p.pid) ?? 0) !== version
+        ) return;
+        applyBridgeStatus(p.pid, p.arch, status);
       })
-      .catch(() => {});
+      .catch(error => {
+        if (
+          !cancelled &&
+          !bridgeCommandPidsRef.current.has(p.pid) &&
+          (bridgeOperationVersionRef.current.get(p.pid) ?? 0) === version
+        ) reportStatusError(p.pid, error);
+      });
+    return () => { cancelled = true; };
   }, [selectedPid]);
 
   return (
@@ -335,7 +516,7 @@ export default function ProcessManager() {
           <Splitter.Panel defaultSize="60%" min="300px">
             <ProcessTable
               processes={processes} filtered={filtered} search={search} onSearch={setSearch}
-              icons={icons} enabled={enabled} selectedPid={selectedPid}
+              icons={icons} speedStates={speedMap} selectedPid={selectedPid}
               onToggle={toggle} onSelect={setSelectedPid}
             />
           </Splitter.Panel>

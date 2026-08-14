@@ -34,6 +34,7 @@
     "injectFail": "주입 실패",
     "enableFail": "가속 활성화 실패",
     "disableFail": "가속 비활성화 실패",
+    "statusFail": "주입 상태 확인 실패",
     "detail": {
       "title": "프로세스 상세",
       "pid": "프로세스 ID",
@@ -48,7 +49,10 @@
       "statusInjected": "주입됨",
       "statusEnabled": "가속 활성화",
       "statusDisabled": "가속 비활성화",
+      "statusInitializing": "초기화 중",
+      "statusFailed": "주입 실패",
       "statusNotInjected": "주입 안 됨",
+      "lastError": "최근 오류",
       "noSelection": "왼쪽 목록에서 프로세스를 선택하여 상세 정보를 확인하세요",
       "yes": "예",
       "no": "아니오",

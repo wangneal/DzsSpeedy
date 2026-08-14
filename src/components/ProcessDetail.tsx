@@ -24,8 +24,9 @@ interface ProcessInfo {
 
 interface SpeedState {
   injected: boolean;
-  enabled: boolean;
   arch: string;
+  phase: "initializing" | "enabled" | "disabled" | "failed";
+  error?: string;
 }
 
 interface ModuleInfo {
@@ -203,17 +204,28 @@ export default function ProcessDetail({ process, speedState, icons }: ProcessDet
 
         {/* Speed / injection status */}
         <DetailRow label={t("process.detail.speedStatus")} value={
-          speedState?.enabled
+          speedState?.phase === "initializing"
+            ? <Chip label={t("process.detail.statusInitializing")} size="small" color="warning" sx={{ fontWeight: 600, fontSize: "0.7rem" }} />
+            : speedState?.phase === "failed"
+              ? <Chip label={t("process.detail.statusFailed")} size="small" color="error" sx={{ fontWeight: 600, fontSize: "0.7rem" }} />
+              : speedState?.phase === "enabled"
             ? <Chip label={t("process.detail.statusEnabled")} size="small" sx={{ fontWeight: 600, fontSize: "0.7rem", bgcolor: "success.main", color: "#fff" }} />
-            : speedState?.injected
-              ? <Chip label={t("process.detail.statusDisabled")} size="small" sx={{ fontWeight: 600, fontSize: "0.7rem", bgcolor: "text.disabled", color: "#fff" }} />
-              : <Chip label={t("process.detail.statusNotInjected")} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem" }} />
+              : speedState?.phase === "disabled"
+                ? <Chip label={t("process.detail.statusDisabled")} size="small" sx={{ fontWeight: 600, fontSize: "0.7rem", bgcolor: "text.disabled", color: "#fff" }} />
+                : <Chip label={t("process.detail.statusNotInjected")} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem" }} />
         } />
         <DetailRow label={t("process.detail.injected")} value={
           <Typography variant="body2">
             {speedState?.injected ? t("process.detail.yes") : t("process.detail.no")}
           </Typography>
         } />
+        {speedState?.phase === "failed" && speedState.error && (
+          <DetailRow label={t("process.detail.lastError")} value={
+            <Typography variant="body2" color="error.main" sx={{ wordBreak: "break-word", fontSize: "0.75rem" }}>
+              {speedState.error}
+            </Typography>
+          } />
+        )}
       </Box>
 
       {/* Modules section */}

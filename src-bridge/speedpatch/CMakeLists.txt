@@ -46,8 +46,14 @@ add_library(${TARGET_NAME} SHARED
 
 target_link_libraries(${TARGET_NAME} PRIVATE minhook winmm)
 target_compile_definitions(${TARGET_NAME} PRIVATE SPEEDPATCH_LIBRARY _CRT_SECURE_NO_WARNINGS)
+if(MSVC)
+    target_compile_options(${TARGET_NAME} PRIVATE /EHsc)
+endif()
 if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 4)
-    target_link_options(${TARGET_NAME} PRIVATE "/EXPORT:SP_HookProc=_SP_HookProc@12")
+    target_link_options(${TARGET_NAME} PRIVATE
+        "/EXPORT:SP_Initialize=_SP_Initialize@4"
+        "/EXPORT:SP_Shutdown=_SP_Shutdown@4"
+    )
 endif()
 
 # shared section for factor
