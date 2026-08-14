@@ -95,29 +95,29 @@ async fn get_system_stats() -> system_stats::SystemStats {
 }
 
 #[tauri::command(async)]
-async fn bridge_inject(pid: u32, arch: String) -> bool {
+async fn bridge_inject(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
         "x86" => bridge_client::bridge32_inject(pid),
         "x64" => bridge_client::bridge64_inject(pid),
-        _ => false,
+        _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
 
 #[tauri::command(async)]
-async fn bridge_enable(pid: u32, arch: String) -> bool {
+async fn bridge_enable(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
         "x86" => bridge_client::bridge32_enable(pid),
         "x64" => bridge_client::bridge64_enable(pid),
-        _ => false,
+        _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
 
 #[tauri::command(async)]
-async fn bridge_disable(pid: u32, arch: String) -> bool {
+async fn bridge_disable(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
         "x86" => bridge_client::bridge32_disable(pid),
         "x64" => bridge_client::bridge64_disable(pid),
-        _ => false,
+        _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
 

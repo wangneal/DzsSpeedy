@@ -57,7 +57,14 @@ export const SnackbarProvider: React.FC<{ children: ReactNode }> = ({ children }
         onClose={handleClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleClose} severity={severity}>
+        <Alert
+          onClose={handleClose}
+          severity={severity}
+          sx={{
+            maxWidth: "min(720px, calc(100vw - 32px))",
+            "& .MuiAlert-message": { overflowWrap: "anywhere", whiteSpace: "pre-wrap" },
+          }}
+        >
           {message}
         </Alert>
       </Snackbar>

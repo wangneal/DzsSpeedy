@@ -31,7 +31,7 @@
     "enable": "Tempo",
     "loading": "Prozesse werden geladen…",
     "noResults": "Keine passenden Prozesse",
-    "injectFail": "Injektion fehlgeschlagen, als Administrator ausführen",
+    "injectFail": "Injektion fehlgeschlagen",
     "enableFail": "Aktivierung fehlgeschlagen",
     "disableFail": "Deaktivierung fehlgeschlagen",
     "detail": {

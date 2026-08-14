@@ -31,7 +31,7 @@
     "enable": "가속",
     "loading": "프로세스 목록 로딩 중…",
     "noResults": "일치하는 프로세스 없음",
-    "injectFail": "주입 실패, 관리자 권한으로 실행해보세요",
+    "injectFail": "주입 실패",
     "enableFail": "가속 활성화 실패",
     "disableFail": "가속 비활성화 실패",
     "detail": {

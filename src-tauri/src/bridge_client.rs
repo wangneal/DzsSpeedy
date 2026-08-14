@@ -17,8 +17,10 @@ fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
 }
 
-fn open_pipe(name: &str) -> Option<HANDLE> {
+fn open_pipe(name: &str) -> Result<HANDLE, String> {
     let name = to_wide(name);
+    let mut last_error = String::from("unknown");
+
     for _ in 0..40 {
         let h = unsafe {
             CreateFileW(
@@ -31,40 +33,121 @@ fn open_pipe(name: &str) -> Option<HANDLE> {
                 None,
             )
         };
-        if let Ok(h) = h {
-            if h != INVALID_HANDLE_VALUE {
+        match h {
+            Ok(h) if h != INVALID_HANDLE_VALUE => {
                 let mut mode = NAMED_PIPE_MODE(PIPE_READMODE_MESSAGE.0);
                 let _ = unsafe { SetNamedPipeHandleState(h, Some(&mut mode), None, None) };
-                return Some(h);
+                return Ok(h);
+            }
+            Ok(_) => {
+                last_error = "CreateFileW returned INVALID_HANDLE_VALUE".into();
+            }
+            Err(e) => {
+                last_error = format!("{e:?}");
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    None
+
+    Err(format!(
+        "open named pipe {name:?} failed after 40 attempts: {last_error}"
+    ))
 }
 
-fn pipe_command(pipe: &str, cmd: &str) -> Option<String> {
-    let h = open_pipe(pipe)?;
+fn pipe_command(pipe: &str, cmd: &str) -> Result<String, String> {
+    let h = match open_pipe(pipe) {
+        Ok(h) => h,
+        Err(error) => {
+            let line = format!("[bridge] {cmd} -> {error}");
+            eprintln!("{line}");
+            frontend_log(&line);
+            return Err(error);
+        }
+    };
+
     let msg = format!("{cmd}\n");
     let mut written = 0u32;
-    let _ = unsafe { WriteFile(h, Some(msg.as_bytes()), Some(&mut written), None) };
+    let write_result = unsafe { WriteFile(h, Some(msg.as_bytes()), Some(&mut written), None) };
+    if write_result.is_err() || written != msg.len() as u32 {
+        let error = format!(
+            "pipe write failed for {cmd} (err={:?}, nwritten={written})",
+            write_result.err()
+        );
+        unsafe { let _ = CloseHandle(h); }
+        let line = format!("[bridge] {cmd} -> {error}");
+        eprintln!("{line}");
+        frontend_log(&line);
+        return Err(error);
+    }
 
     let mut buf = [0u8; 4096];
     let mut nread = 0u32;
-    let ok = unsafe { ReadFile(h, Some(&mut buf), Some(&mut nread), None) };
+    let read_result = unsafe { ReadFile(h, Some(&mut buf), Some(&mut nread), None) };
     unsafe { let _ = CloseHandle(h); }
 
-    if ok.is_err() || nread == 0 {
-        let line = format!("[bridge] {cmd} → pipe read failed (err={:?}, nread={nread})", ok.err());
-        eprintln!("{}", line);
+    if let Err(error) = read_result {
+        let detail = format!("pipe read failed for {cmd} (err={error:?}, nread={nread})");
+        let line = format!("[bridge] {cmd} -> {detail}");
+        eprintln!("{line}");
         frontend_log(&line);
-        return None;
+        return Err(detail);
     }
+    if nread == 0 {
+        let detail = format!("pipe read returned no data for {cmd}");
+        let line = format!("[bridge] {cmd} -> {detail}");
+        eprintln!("{line}");
+        frontend_log(&line);
+        return Err(detail);
+    }
+
     let resp = String::from_utf8_lossy(&buf[..nread as usize]).trim().to_string();
-    let line = format!("[bridge] {cmd} → {resp}");
-    eprintln!("{}", line);
+    let line = format!("[bridge] {cmd} -> {resp}");
+    eprintln!("{line}");
     frontend_log(&line);
-    Some(resp)
+    Ok(resp)
+}
+
+fn bridge_response_result(cmd: &str, response: &str) -> Result<(), String> {
+    if response == "OK" {
+        return Ok(());
+    }
+
+    if let Some(detail) = response.strip_prefix("ERROR ") {
+        return Err(format!("{cmd}: {detail}"));
+    }
+
+    Err(format!("{cmd}: unexpected bridge response: {response}"))
+}
+
+fn expect_ok(pipe: &str, cmd: &str) -> Result<(), String> {
+    let response = pipe_command(pipe, cmd)?;
+    bridge_response_result(cmd, &response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bridge_response_result;
+
+    #[test]
+    fn accepts_ok_response() {
+        assert_eq!(bridge_response_result("INJECT 42", "OK"), Ok(()));
+    }
+
+    #[test]
+    fn preserves_bridge_error_response() {
+        assert_eq!(
+            bridge_response_result("INJECT 42", "ERROR remote LoadLibrary failed"),
+            Err("INJECT 42: remote LoadLibrary failed".to_string())
+        );
+    }
+
+    #[test]
+    fn reports_unexpected_response() {
+        assert_eq!(
+            bridge_response_result("ENABLE 42", "BROKEN"),
+            Err("ENABLE 42: unexpected bridge response: BROKEN".to_string())
+        );
+    }
 }
 
 /// 追加写诊断日志到 %TEMP%\dzsspeedy-frontend.log
@@ -103,7 +186,7 @@ pub fn bridge32_set_speed(factor: f64) -> bool {
 
 /// Get speed factor from bridge64.
 pub fn bridge64_get_speed() -> Option<f64> {
-    pipe_command(PIPE_64, "GETSPEED").and_then(|r| r.strip_prefix("OK ").and_then(|s| s.parse().ok()))
+    pipe_command(PIPE_64, "GETSPEED").ok().and_then(|r| r.strip_prefix("OK ").and_then(|s| s.parse().ok()))
 }
 
 /// Send SHUTDOWN to bridge64 (fire-and-forget — bridge exits after receiving).
@@ -118,11 +201,11 @@ pub fn bridge32_shutdown() {
 
 // ── Per-arch inject / eject / enable / disable ──
 
-pub fn bridge64_inject(pid: u32) -> bool {
-    pipe_command(PIPE_64, &format!("INJECT {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge64_inject(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_64, &format!("INJECT {pid}"))
 }
-pub fn bridge32_inject(pid: u32) -> bool {
-    pipe_command(PIPE_32, &format!("INJECT {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge32_inject(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_32, &format!("INJECT {pid}"))
 }
 
 #[allow(dead_code)]
@@ -134,31 +217,31 @@ pub fn bridge32_eject(pid: u32) -> bool {
     pipe_command(PIPE_32, &format!("EJECT {pid}")).map(|r| r == "OK").unwrap_or(false)
 }
 
-pub fn bridge64_enable(pid: u32) -> bool {
-    pipe_command(PIPE_64, &format!("ENABLE {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge64_enable(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_64, &format!("ENABLE {pid}"))
 }
-pub fn bridge32_enable(pid: u32) -> bool {
-    pipe_command(PIPE_32, &format!("ENABLE {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge32_enable(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_32, &format!("ENABLE {pid}"))
 }
 
-pub fn bridge64_disable(pid: u32) -> bool {
-    pipe_command(PIPE_64, &format!("DISABLE {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge64_disable(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_64, &format!("DISABLE {pid}"))
 }
-pub fn bridge32_disable(pid: u32) -> bool {
-    pipe_command(PIPE_32, &format!("DISABLE {pid}")).map(|r| r == "OK").unwrap_or(false)
+pub fn bridge32_disable(pid: u32) -> Result<(), String> {
+    expect_ok(PIPE_32, &format!("DISABLE {pid}"))
 }
 
 /// Query per-PID status from bridge.
 /// Returns Some(true) = injected + enabled, Some(false) = injected + disabled, None = not found / error.
 pub fn bridge64_get_status(pid: u32) -> Option<bool> {
-    match pipe_command(PIPE_64, &format!("STATUS {pid}"))?.as_str() {
+    match pipe_command(PIPE_64, &format!("STATUS {pid}")).ok()?.as_str() {
         "OK ENABLED" => Some(true),
         "OK DISABLED" => Some(false),
         _ => None,
     }
 }
 pub fn bridge32_get_status(pid: u32) -> Option<bool> {
-    match pipe_command(PIPE_32, &format!("STATUS {pid}"))?.as_str() {
+    match pipe_command(PIPE_32, &format!("STATUS {pid}")).ok()?.as_str() {
         "OK ENABLED" => Some(true),
         "OK DISABLED" => Some(false),
         _ => None,

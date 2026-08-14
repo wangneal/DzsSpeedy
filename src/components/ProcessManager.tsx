@@ -31,6 +31,31 @@ interface ProcessInfo {
 const ROW_H = 42;
 const COL = { pid: 72, check: 60 } as const;
 
+function bridgeErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  try {
+    const serialized = JSON.stringify(error);
+    return serialized || String(error);
+  } catch {
+    return String(error);
+  }
+}
+
+async function invokeBridgeCommand(command: string, args: Record<string, unknown>): Promise<string | null> {
+  try {
+    await invoke(command, args);
+    return null;
+  } catch (error) {
+    const detail = bridgeErrorMessage(error);
+    console.error(`[toggle] ${command} failed:`, detail);
+    return detail;
+  }
+}
+
 function ProcessIcon({ pid, icons }: { pid: number; icons: Record<number, string> }) {
   const src = icons[pid];
   if (src) return <Avatar src={src} variant="rounded" sx={{ width: 22, height: 22, flexShrink: 0, borderRadius: 0.5 }} />;
@@ -188,28 +213,28 @@ export default function ProcessManager() {
       if (!wasInjected) {
         // First time inject
         setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { injected: true, enabled: true, arch }); return n; });
-        const ok = await invoke<boolean>("bridge_inject", { pid, arch }).catch((e) => { console.error("[toggle] bridge_inject error:", e); return false; });
-        console.log("[toggle] bridge_inject result:", ok);
-        if (!ok) {
+        const error = await invokeBridgeCommand("bridge_inject", { pid, arch });
+        console.log("[toggle] bridge_inject result:", error ?? "OK");
+        if (error) {
           setSpeedMap(prev => { const n = new Map(prev); n.delete(pid); return n; });
-          notify(t("process.injectFail"), "error");
+          notify(`${t("process.injectFail")}: ${error}`, "error", 10000);
         }
       } else {
         // Already injected — re-enable
         setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { ...cur!, enabled: true }); return n; });
-        const ok = await invoke<boolean>("bridge_enable", { pid, arch }).catch(() => false);
-        if (!ok) {
+        const error = await invokeBridgeCommand("bridge_enable", { pid, arch });
+        if (error) {
           setSpeedMap(prev => { const n = new Map(prev); n.set(pid, cur!); return n; });
-          notify(t("process.enableFail"), "error");
+          notify(`${t("process.enableFail")}: ${error}`, "error", 10000);
         }
       }
     } else {
       // Turning OFF
       setSpeedMap(prev => { const n = new Map(prev); n.set(pid, { ...cur!, enabled: false }); return n; });
-      const ok = await invoke<boolean>("bridge_disable", { pid, arch }).catch(() => false);
-      if (!ok) {
+      const error = await invokeBridgeCommand("bridge_disable", { pid, arch });
+      if (error) {
         setSpeedMap(prev => { const n = new Map(prev); n.set(pid, cur!); return n; });
-        notify(t("process.disableFail"), "error");
+        notify(`${t("process.disableFail")}: ${error}`, "error", 10000);
       }
     }
   }

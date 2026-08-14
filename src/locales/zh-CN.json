@@ -35,7 +35,7 @@
     "enable": "加速",
     "loading": "正在加载进程列表…",
     "noResults": "无匹配进程",
-    "injectFail": "注入失败，请检查是否以管理员身份运行",
+    "injectFail": "注入失败",
     "enableFail": "启用加速失败",
     "disableFail": "禁用加速失败",
     "detail": {

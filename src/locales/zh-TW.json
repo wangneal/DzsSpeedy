@@ -31,7 +31,7 @@
     "enable": "啟用",
     "loading": "正在載入程序清單...",
     "noResults": "無適用程序",
-    "injectFail": "注入失敗，請檢查是否以系統管理員身分執行",
+    "injectFail": "注入失敗",
     "enableFail": "啟用加速失敗",
     "disableFail": "停用加速失敗",
     "detail": {

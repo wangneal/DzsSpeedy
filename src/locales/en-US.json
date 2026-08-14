@@ -35,7 +35,7 @@
     "enable": "Speed",
     "loading": "Loading processes…",
     "noResults": "No matching processes",
-    "injectFail": "Injection failed, try running as administrator",
+    "injectFail": "Injection failed",
     "enableFail": "Failed to enable speed",
     "disableFail": "Failed to disable speed",
     "detail": {

@@ -31,7 +31,7 @@
     "enable": "加速",
     "loading": "プロセスリストを読み込み中…",
     "noResults": "一致するプロセスがありません",
-    "injectFail": "注入に失敗しました。管理者として実行してください",
+    "injectFail": "注入に失敗しました",
     "enableFail": "加速の有効化に失敗しました",
     "disableFail": "加速の無効化に失敗しました",
     "detail": {
