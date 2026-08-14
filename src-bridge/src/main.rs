@@ -26,16 +26,22 @@ use std::os::windows::ffi::OsStrExt;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 
-use windows::core::{s, HRESULT, PCSTR, PCWSTR};
+use windows::core::{s, HRESULT, PCWSTR};
 
 use windows::Win32::Foundation::{
-    CloseHandle, FreeLibrary, GetLastError, ERROR_ALREADY_EXISTS, ERROR_BAD_LENGTH,
-    ERROR_FILE_NOT_FOUND, ERROR_INVALID_PARAMETER, ERROR_NO_MORE_FILES, ERROR_PIPE_CONNECTED,
-    HANDLE, INVALID_HANDLE_VALUE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    CloseHandle, FreeLibrary, GetLastError, LocalFree, BOOL, ERROR_ALREADY_EXISTS,
+    ERROR_BAD_LENGTH, ERROR_FILE_NOT_FOUND, ERROR_INVALID_PARAMETER, ERROR_IO_PENDING,
+    ERROR_NO_MORE_FILES, ERROR_PIPE_CONNECTED, HANDLE, HINSTANCE, HLOCAL, HWND,
+    INVALID_HANDLE_VALUE, LPARAM, LRESULT, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT, WPARAM,
 };
+
+use windows::Win32::Security::Authorization::{
+    ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+};
+use windows::Win32::Security::{PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES};
 
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_FLAGS_AND_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
@@ -43,24 +49,21 @@ use windows::Win32::Storage::FileSystem::{
 };
 
 use windows::Win32::System::Threading::{
-    CreateEventW, CreateMutexW, CreateRemoteThread, GetExitCodeThread, IsWow64Process2,
-    OpenProcess, WaitForSingleObject, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
+    CreateEventW, CreateMutexW, IsWow64Process2, OpenProcess, ResetEvent, WaitForSingleObject,
+    PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
 };
 
 use windows::Win32::System::Memory::{
-    CreateFileMappingW, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, VirtualAllocEx,
-    VirtualFreeEx, FILE_MAP_ALL_ACCESS, FILE_MAP_READ, FILE_MAP_WRITE, MEM_COMMIT, MEM_RELEASE,
-    MEM_RESERVE, PAGE_READWRITE,
+    CreateFileMappingW, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, FILE_MAP_ALL_ACCESS,
+    FILE_MAP_READ, FILE_MAP_WRITE, PAGE_READWRITE,
 };
-
-use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
 
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, MODULEENTRY32W, TH32CS_SNAPMODULE,
+    CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, Thread32First, Thread32Next,
+    MODULEENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPTHREAD, THREADENTRY32,
 };
 
-use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress, LoadLibraryW};
+use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 
 use windows::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, SetNamedPipeHandleState, NAMED_PIPE_MODE,
@@ -69,6 +72,10 @@ use windows::Win32::System::Pipes::{
 use windows::Win32::System::SystemInformation::{
     IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386,
     IMAGE_FILE_MACHINE_UNKNOWN,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindowThreadProcessId, IsWindowVisible, PostThreadMessageW, SetWindowsHookExW,
+    UnhookWindowsHookEx, HHOOK, WH_GETMESSAGE, WM_NULL,
 };
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -79,10 +86,121 @@ fn to_wide(s: &str) -> Vec<u16> {
         .collect()
 }
 
-type RemoteThreadStart = unsafe extern "system" fn(*mut std::ffi::c_void) -> u32;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HookThreadCandidate {
+    thread_id: u32,
+    visible: bool,
+}
 
-unsafe fn remote_thread_start(address: usize) -> RemoteThreadStart {
-    unsafe { std::mem::transmute::<usize, RemoteThreadStart>(address) }
+fn ordered_hook_threads(
+    window_candidates: &[HookThreadCandidate],
+    process_threads: &[u32],
+) -> Vec<u32> {
+    let mut ordered = Vec::new();
+    for visible in [true, false] {
+        for candidate in window_candidates {
+            if candidate.visible == visible
+                && candidate.thread_id != 0
+                && !ordered.contains(&candidate.thread_id)
+            {
+                ordered.push(candidate.thread_id);
+            }
+        }
+    }
+    for &thread_id in process_threads {
+        if thread_id != 0 && !ordered.contains(&thread_id) {
+            ordered.push(thread_id);
+        }
+    }
+    ordered
+}
+
+struct EnumWindowsContext {
+    pid: u32,
+    candidates: Vec<HookThreadCandidate>,
+}
+
+unsafe extern "system" fn collect_target_window_threads(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let context = unsafe { &mut *(lparam.0 as *mut EnumWindowsContext) };
+    let mut window_pid = 0u32;
+    let thread_id = unsafe { GetWindowThreadProcessId(hwnd, Some(&mut window_pid)) };
+    if window_pid == context.pid && thread_id != 0 {
+        let visible = unsafe { IsWindowVisible(hwnd) }.as_bool();
+        if !context
+            .candidates
+            .iter()
+            .any(|candidate| candidate.thread_id == thread_id)
+        {
+            context
+                .candidates
+                .push(HookThreadCandidate { thread_id, visible });
+        }
+    }
+    BOOL::from(true)
+}
+
+fn target_process_threads(pid: u32) -> Result<Vec<u32>, String> {
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }.map_err(|error| {
+        format!("CreateToolhelp32Snapshot(threads, pid={pid}) failed: {error:?}")
+    })?;
+    let mut threads = Vec::new();
+    let mut entry = THREADENTRY32 {
+        dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+        ..Default::default()
+    };
+
+    let first = unsafe { Thread32First(snapshot, &mut entry) };
+    if let Err(error) = first {
+        unsafe {
+            let _ = CloseHandle(snapshot);
+        }
+        if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) {
+            return Ok(threads);
+        }
+        return Err(format!("Thread32First(pid={pid}) failed: {error:?}"));
+    }
+
+    loop {
+        if entry.th32OwnerProcessID == pid && entry.th32ThreadID != 0 {
+            threads.push(entry.th32ThreadID);
+        }
+        match unsafe { Thread32Next(snapshot, &mut entry) } {
+            Ok(()) => {}
+            Err(error) if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) => break,
+            Err(error) => {
+                unsafe {
+                    let _ = CloseHandle(snapshot);
+                }
+                return Err(format!("Thread32Next(pid={pid}) failed: {error:?}"));
+            }
+        }
+    }
+    unsafe {
+        let _ = CloseHandle(snapshot);
+    }
+    Ok(threads)
+}
+
+fn target_hook_threads(pid: u32) -> Result<Vec<u32>, String> {
+    let mut context = EnumWindowsContext {
+        pid,
+        candidates: Vec::new(),
+    };
+    unsafe {
+        EnumWindows(
+            Some(collect_target_window_threads),
+            LPARAM(&mut context as *mut EnumWindowsContext as isize),
+        )
+        .map_err(|error| format!("EnumWindows(pid={pid}) failed: {error:?}"))?;
+    }
+    let process_threads = target_process_threads(pid)?;
+    let candidates = ordered_hook_threads(&context.candidates, &process_threads);
+    if candidates.is_empty() {
+        return Err(format!(
+            "no hook thread candidate is available for pid={pid}"
+        ));
+    }
+    Ok(candidates)
 }
 
 fn exe_dir() -> Result<PathBuf, String> {
@@ -254,16 +372,25 @@ enum InjectionStatus {
     NotInjected,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SpeedpatchHandshake {
+    state: SpeedpatchState,
+    init_result: u32,
+    hook_thread_id: u32,
+    callback_completed: bool,
+}
+
 const SP_STATE_INITIALIZING: u32 = 0x49;
 const SP_STATE_DISABLED: u32 = 0x44;
 const SP_STATE_ENABLED: u32 = 0x45;
 const SP_STATE_FAILED: u32 = 0x46;
+const SP_HOOK_COMPLETED_BIT: u32 = 1 << 31;
 
 /// Read the DLL-owned handshake mapping.
 ///
 /// `Ok(None)` is deliberately reserved for an absent mapping. Permission and
 /// mapping failures are status probe errors, not evidence that the DLL is gone.
-fn read_speedpatch_state(pid: u32) -> Result<Option<SpeedpatchState>, String> {
+fn read_speedpatch_handshake(pid: u32) -> Result<Option<SpeedpatchHandshake>, String> {
     let name = speedpatch_map_name(pid);
 
     unsafe {
@@ -277,7 +404,7 @@ fn read_speedpatch_state(pid: u32) -> Result<Option<SpeedpatchState>, String> {
             }
         };
 
-        let view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, std::mem::size_of::<u32>());
+        let view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, std::mem::size_of::<u32>() * 3);
 
         if view.Value.is_null() {
             let gle = GetLastError();
@@ -289,17 +416,48 @@ fn read_speedpatch_state(pid: u32) -> Result<Option<SpeedpatchState>, String> {
             ));
         }
 
-        let state = (&*(view.Value as *const AtomicU32)).load(Ordering::Acquire);
+        let values = view.Value as *const AtomicU32;
+        let state = (&*values).load(Ordering::Acquire);
+        let init_result = (&*values.add(1)).load(Ordering::Acquire);
+        let raw_hook_thread_id = (&*values.add(2)).load(Ordering::Acquire);
+        let callback_completed = raw_hook_thread_id & SP_HOOK_COMPLETED_BIT != 0;
+        let hook_thread_id = raw_hook_thread_id & !SP_HOOK_COMPLETED_BIT;
 
         let _ = UnmapViewOfFile(view);
 
         let _ = CloseHandle(h);
 
         match state {
-            SP_STATE_INITIALIZING => Ok(Some(SpeedpatchState::Initializing)),
-            SP_STATE_DISABLED => Ok(Some(SpeedpatchState::Disabled)),
-            SP_STATE_ENABLED => Ok(Some(SpeedpatchState::Enabled)),
-            SP_STATE_FAILED => Ok(Some(SpeedpatchState::Failed)),
+            0 => Ok(Some(SpeedpatchHandshake {
+                state: SpeedpatchState::Initializing,
+                init_result,
+                hook_thread_id,
+                callback_completed,
+            })),
+            SP_STATE_INITIALIZING => Ok(Some(SpeedpatchHandshake {
+                state: SpeedpatchState::Initializing,
+                init_result,
+                hook_thread_id,
+                callback_completed,
+            })),
+            SP_STATE_DISABLED => Ok(Some(SpeedpatchHandshake {
+                state: SpeedpatchState::Disabled,
+                init_result,
+                hook_thread_id,
+                callback_completed,
+            })),
+            SP_STATE_ENABLED => Ok(Some(SpeedpatchHandshake {
+                state: SpeedpatchState::Enabled,
+                init_result,
+                hook_thread_id,
+                callback_completed,
+            })),
+            SP_STATE_FAILED => Ok(Some(SpeedpatchHandshake {
+                state: SpeedpatchState::Failed,
+                init_result,
+                hook_thread_id,
+                callback_completed,
+            })),
             value => Err(format!(
                 "DzsSpeedy.{pid} contains unsupported state value 0x{value:08x}; DLL/bridge protocol mismatch"
             )),
@@ -326,28 +484,46 @@ fn write_speedpatch_enabled(pid: u32, enabled: bool) -> Result<(), String> {
         }
 
         let state = &*(view.Value as *const AtomicU32);
-        if state.load(Ordering::Acquire) == SP_STATE_FAILED {
-            let _ = UnmapViewOfFile(view);
-            let _ = CloseHandle(h);
-            return Err(format!(
-                "SP_Initialize failed for pid={pid}; restart the target before changing state"
-            ));
-        }
-
-        state.store(
-            if enabled {
-                SP_STATE_ENABLED
-            } else {
-                SP_STATE_DISABLED
-            },
-            Ordering::Release,
-        );
+        let desired = if enabled {
+            SP_STATE_ENABLED
+        } else {
+            SP_STATE_DISABLED
+        };
+        let result = loop {
+            let current = state.load(Ordering::Acquire);
+            match current {
+                value if value == desired => break Ok(()),
+                SP_STATE_FAILED => {
+                    break Err(format!(
+                        "SP_Initialize failed for pid={pid}; restart the target before changing state"
+                    ));
+                }
+                SP_STATE_INITIALIZING if enabled => {
+                    break Err(format!(
+                        "INJECTION_PENDING: SP_Initialize is still running for pid={pid}"
+                    ));
+                }
+                SP_STATE_INITIALIZING | SP_STATE_DISABLED | SP_STATE_ENABLED => {
+                    if state
+                        .compare_exchange(current, desired, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                    {
+                        break Ok(());
+                    }
+                }
+                value => {
+                    break Err(format!(
+                        "DzsSpeedy.{pid} contains unsupported state value 0x{value:08x}; DLL/bridge protocol mismatch"
+                    ));
+                }
+            }
+        };
 
         let _ = UnmapViewOfFile(view);
 
         let _ = CloseHandle(h);
 
-        Ok(())
+        result
     }
 }
 
@@ -408,7 +584,6 @@ fn record_injection_failure(pid: u32, detail: String) {
     if let Ok(mut failures) = injection_failures().lock() {
         failures.insert(pid, detail);
     }
-    untrack_target(pid);
 }
 
 fn injection_failure(pid: u32) -> Option<String> {
@@ -424,22 +599,53 @@ fn clear_injection_failure(pid: u32) {
     }
 }
 
-static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
-static ACTIVE_REMOTE_OPERATIONS: AtomicU32 = AtomicU32::new(0);
+const OPERATION_SHUTDOWN_BIT: u32 = 1 << 31;
+const OPERATION_COUNT_MASK: u32 = OPERATION_SHUTDOWN_BIT - 1;
+static REMOTE_OPERATION_STATE: AtomicU32 = AtomicU32::new(0);
 
 struct RemoteOperationLease;
 
+fn try_acquire_operation_slot(state: &AtomicU32) -> Result<(), String> {
+    loop {
+        let current = state.load(Ordering::Acquire);
+        if current & OPERATION_SHUTDOWN_BIT != 0 {
+            return Err("bridge shutdown is in progress; operation was not started".into());
+        }
+        if current & OPERATION_COUNT_MASK == OPERATION_COUNT_MASK {
+            return Err("too many concurrent bridge operations".into());
+        }
+        if state
+            .compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            return Ok(());
+        }
+    }
+}
+
 impl RemoteOperationLease {
-    fn new() -> Self {
-        ACTIVE_REMOTE_OPERATIONS.fetch_add(1, Ordering::AcqRel);
-        Self
+    fn try_acquire() -> Result<Self, String> {
+        try_acquire_operation_slot(&REMOTE_OPERATION_STATE)?;
+        Ok(Self)
     }
 }
 
 impl Drop for RemoteOperationLease {
     fn drop(&mut self) {
-        ACTIVE_REMOTE_OPERATIONS.fetch_sub(1, Ordering::AcqRel);
+        REMOTE_OPERATION_STATE.fetch_sub(1, Ordering::AcqRel);
     }
+}
+
+fn shutdown_requested() -> bool {
+    REMOTE_OPERATION_STATE.load(Ordering::Acquire) & OPERATION_SHUTDOWN_BIT != 0
+}
+
+fn request_shutdown() {
+    REMOTE_OPERATION_STATE.fetch_or(OPERATION_SHUTDOWN_BIT, Ordering::AcqRel);
+}
+
+fn active_remote_operations() -> u32 {
+    REMOTE_OPERATION_STATE.load(Ordering::Acquire) & OPERATION_COUNT_MASK
 }
 
 fn finish_injection_success(pid: u32) {
@@ -447,7 +653,7 @@ fn finish_injection_success(pid: u32) {
     clear_injection_failure(pid);
     track_target(pid);
 
-    if SHUTDOWN_REQUESTED.load(Ordering::Acquire) {
+    if shutdown_requested() {
         match write_speedpatch_enabled(pid, false) {
             Ok(()) => dbg_log(&format!(
                 "injection completed during shutdown; disabled speedpatch for pid={pid}"
@@ -482,31 +688,1009 @@ struct RemoteModule {
     path: String,
 }
 
-enum RemoteLoadError {
-    Failed(String),
+struct InitializationError {
+    detail: String,
+}
+
+type WindowsHookProc = unsafe extern "system" fn(i32, WPARAM, LPARAM) -> LRESULT;
+
+struct LocalSecurityDescriptor(PSECURITY_DESCRIPTOR);
+
+impl LocalSecurityDescriptor {
+    fn completion_event() -> Result<Self, String> {
+        // Administrators/SYSTEM retain full control. Any authenticated target
+        // may only signal the event, and the low integrity label permits that
+        // write even when the bridge itself is elevated.
+        let sddl = to_wide("D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x0002;;;AU)S:(ML;;NW;;;LW)");
+        let mut descriptor = PSECURITY_DESCRIPTOR::default();
+        unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                PCWSTR::from_raw(sddl.as_ptr()),
+                SDDL_REVISION_1,
+                &mut descriptor,
+                None,
+            )
+        }
+        .map_err(|error| format!("build completion-event security descriptor failed: {error:?}"))?;
+        Ok(Self(descriptor))
+    }
+}
+
+impl Drop for LocalSecurityDescriptor {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = LocalFree(HLOCAL(self.0 .0));
+        }
+    }
+}
+
+struct HookCompletionEvent {
+    handle: HANDLE,
+    pid: u32,
+}
+
+// Kernel event handles are valid across threads. This wrapper owns exactly
+// one handle and exposes only reset/wait semantics.
+unsafe impl Send for HookCompletionEvent {}
+
+impl HookCompletionEvent {
+    fn create(pid: u32) -> Result<Self, String> {
+        let name = to_wide(&format!("DzsSpeedyHookComplete.{pid}"));
+        let descriptor = LocalSecurityDescriptor::completion_event()?;
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: descriptor.0 .0,
+            bInheritHandle: BOOL::from(false),
+        };
+        let handle = unsafe {
+            CreateEventW(
+                Some(&attributes),
+                true,
+                false,
+                PCWSTR::from_raw(name.as_ptr()),
+            )
+        }
+        .map_err(|error| format!("CreateEventW(DzsSpeedyHookComplete.{pid}) failed: {error:?}"))?;
+        if let Err(error) = unsafe { ResetEvent(handle) } {
+            unsafe {
+                let _ = CloseHandle(handle);
+            }
+            return Err(format!(
+                "ResetEvent(DzsSpeedyHookComplete.{pid}) failed: {error:?}"
+            ));
+        }
+        Ok(Self { handle, pid })
+    }
+
+    fn is_signaled(&self) -> Result<bool, String> {
+        let wait = unsafe { WaitForSingleObject(self.handle, 0) };
+        if wait == WAIT_OBJECT_0 {
+            return Ok(true);
+        }
+        if wait == WAIT_TIMEOUT {
+            return Ok(false);
+        }
+        if wait == WAIT_FAILED {
+            let error = unsafe { GetLastError() };
+            return Err(format!(
+                "WaitForSingleObject(DzsSpeedyHookComplete.{}) failed: win32_error={}",
+                self.pid, error.0
+            ));
+        }
+        Err(format!(
+            "WaitForSingleObject(DzsSpeedyHookComplete.{}) returned 0x{:08x}",
+            self.pid, wait.0
+        ))
+    }
+}
+
+impl Drop for HookCompletionEvent {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.handle);
+        }
+    }
+}
+
+struct TargetProcessHandle {
+    handle: HANDLE,
+    pid: u32,
+}
+
+// Kernel process handles are valid across threads. This wrapper owns exactly
+// one handle and only exposes wait operations.
+unsafe impl Send for TargetProcessHandle {}
+
+impl TargetProcessHandle {
+    fn open(pid: u32) -> Result<Self, String> {
+        let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, pid) }.map_err(|error| {
+            if error.code() == HRESULT::from_win32(ERROR_INVALID_PARAMETER.0) {
+                format!("TARGET_EXITED: pid={pid} exited before hook installation")
+            } else {
+                format!("OpenProcess(PROCESS_SYNCHRONIZE, pid={pid}) failed: {error:?}")
+            }
+        })?;
+        Ok(Self { handle, pid })
+    }
+
+    fn has_exited(&self) -> Result<bool, String> {
+        let wait = unsafe { WaitForSingleObject(self.handle, 0) };
+        if wait == WAIT_OBJECT_0 {
+            return Ok(true);
+        }
+        if wait == WAIT_TIMEOUT {
+            return Ok(false);
+        }
+        if wait == WAIT_FAILED {
+            let error = unsafe { GetLastError() };
+            return Err(format!(
+                "WaitForSingleObject(target pid={}) failed: win32_error={}",
+                self.pid, error.0
+            ));
+        }
+        Err(format!(
+            "WaitForSingleObject(target pid={}) returned 0x{:08x}",
+            self.pid, wait.0
+        ))
+    }
+}
+
+impl Drop for TargetProcessHandle {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.handle);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum HandshakeProgress {
+    Pending,
+    Complete {
+        callback_thread: u32,
+        state: SpeedpatchState,
+    },
+    Failed {
+        callback_thread: u32,
+        init_result: u32,
+    },
+    Invalid(String),
+}
+
+fn classify_handshake(handshake: SpeedpatchHandshake) -> HandshakeProgress {
+    if !handshake.callback_completed
+        || handshake.hook_thread_id == 0
+        || handshake.init_result == ERROR_IO_PENDING.0
+    {
+        return HandshakeProgress::Pending;
+    }
+
+    match handshake.state {
+        SpeedpatchState::Initializing => HandshakeProgress::Pending,
+        SpeedpatchState::Enabled | SpeedpatchState::Disabled if handshake.init_result == 0 => {
+            HandshakeProgress::Complete {
+                callback_thread: handshake.hook_thread_id,
+                state: handshake.state,
+            }
+        }
+        SpeedpatchState::Failed if handshake.init_result != 0 => HandshakeProgress::Failed {
+            callback_thread: handshake.hook_thread_id,
+            init_result: handshake.init_result,
+        },
+        SpeedpatchState::Enabled | SpeedpatchState::Disabled if handshake.init_result != 0 => {
+            // The callback publishes its result before the terminal state. A
+            // concurrent logical disable may therefore expose this transient
+            // pair; wait for FAILED instead of replacing the native error with
+            // a protocol-mismatch message.
+            HandshakeProgress::Pending
+        }
+        _ => HandshakeProgress::Invalid(format!(
+            "inconsistent callback handshake: state={:?}, init_result=0x{:08x}, callback_thread={}",
+            handshake.state, handshake.init_result, handshake.hook_thread_id
+        )),
+    }
+}
+
+struct InstalledWindowsHook {
+    hook: HHOOK,
+    thread_id: u32,
+}
+
+struct InstalledWindowsHooks {
+    hooks: Vec<InstalledWindowsHook>,
+    local_module: Option<windows::Win32::Foundation::HMODULE>,
+}
+
+// HHOOK and this process-local HMODULE may be released from another bridge
+// thread. The container is move-only and remains their sole owner.
+unsafe impl Send for InstalledWindowsHooks {}
+
+impl InstalledWindowsHooks {
+    fn cleanup(&mut self) -> Result<(), String> {
+        let mut retained = Vec::new();
+        let mut errors = Vec::new();
+        unsafe {
+            for installed in self.hooks.drain(..) {
+                if let Err(error) = UnhookWindowsHookEx(installed.hook) {
+                    errors.push(format!(
+                        "thread={}, hook={:?}: {error:?}",
+                        installed.thread_id, installed.hook
+                    ));
+                    retained.push(installed);
+                }
+            }
+            self.hooks = retained;
+            if self.hooks.is_empty() {
+                if let Some(module) = self.local_module.take() {
+                    let _ = FreeLibrary(module);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "UnhookWindowsHookEx failed; retaining the local DLL reference for active hooks: {}",
+                errors.join("; ")
+            ))
+        }
+    }
+
+    fn release_after_target_exit(&mut self) {
+        self.hooks.clear();
+        if let Some(module) = self.local_module.take() {
+            unsafe {
+                let _ = FreeLibrary(module);
+            }
+        }
+    }
+}
+
+impl Drop for InstalledWindowsHooks {
+    fn drop(&mut self) {
+        if let Err(error) = self.cleanup() {
+            dbg_log(&format!("hook cleanup incomplete: {error}"));
+        }
+    }
+}
+
+enum HookWaitOutcome {
+    Complete {
+        callback_thread: u32,
+        state: SpeedpatchState,
+    },
     Pending {
+        callback_thread: u32,
         detail: String,
-        thread: HANDLE,
-        remote_mem: usize,
     },
 }
 
-struct RemoteInitError {
-    detail: String,
-    safe_to_unload: bool,
-    pending_thread: Option<HANDLE>,
+enum HookInjectionOutcome {
+    Complete {
+        callback_thread: u32,
+        state: SpeedpatchState,
+    },
+    Pending {
+        process: TargetProcessHandle,
+        callback_thread: u32,
+        detail: String,
+        hooks: Option<InstalledWindowsHooks>,
+        completion: HookCompletionEvent,
+        initial_log_len: u64,
+    },
 }
 
-enum FinishLoadedOutcome {
-    Complete,
-    Pending(String),
-}
-
-/// Inject using one same-architecture path: LoadLibraryW, then SP_Initialize.
-fn do_inject(pid: u32) -> Result<(), String> {
-    if SHUTDOWN_REQUESTED.load(Ordering::Acquire) {
-        return Err("bridge shutdown is in progress; injection was not started".into());
+fn initialization_failure_detail(pid: u32, init_result: u32) -> String {
+    match decode_initialize_exit_code(init_result) {
+        Ok(()) => {
+            format!("speedpatch reported FAILED for pid={pid} without an initialization error code")
+        }
+        Err(error) => error.detail,
     }
+}
+
+fn persisted_initialization_failure(pid: u32, handshake: SpeedpatchHandshake) -> String {
+    injection_failure(pid).unwrap_or_else(|| {
+        if handshake.init_result != 0 {
+            format!(
+                "SP_HookProc initialization failed for pid={pid}, callback_thread={}: {}",
+                handshake.hook_thread_id,
+                initialization_failure_detail(pid, handshake.init_result)
+            )
+        } else {
+            format!(
+                "SP_Initialize failed for pid={pid} without a persisted native error; restart the target before retrying"
+            )
+        }
+    })
+}
+
+fn speedpatch_log_tail(pid: u32, initial_len: u64) -> Option<String> {
+    let path = std::env::temp_dir().join(format!("dzsspeedy-speedpatch-{pid}.log"));
+    let bytes = std::fs::read(path).ok()?;
+    let start = usize::try_from(initial_len).ok()?.min(bytes.len());
+    let start = start + (start % 2);
+    let end = bytes.len() - (bytes.len() % 2);
+    if start > end {
+        return None;
+    }
+    Some(String::from_utf16_lossy(
+        &bytes[start..end]
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn latest_speedpatch_install_failure(pid: u32, initial_len: u64) -> Option<String> {
+    speedpatch_log_tail(pid, initial_len)?
+        .lines()
+        .rev()
+        .find(|line| line.contains("SP_Install:") && line.contains("FAILED"))
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
+fn completed_without_terminal_handshake_detail(
+    pid: u32,
+    callback_thread: u32,
+    initial_log_len: u64,
+) -> String {
+    let native_detail = latest_speedpatch_install_failure(pid, initial_log_len)
+        .map(|line| format!(" Native DLL error: {line}"))
+        .unwrap_or_default();
+    format!(
+        "SP_HookProc signaled completion for pid={pid}, callback_thread={callback_thread}, but the terminal handshake is unavailable.{native_detail} DLL log: {}",
+        std::env::temp_dir()
+            .join(format!("dzsspeedy-speedpatch-{pid}.log"))
+            .display()
+    )
+}
+
+fn wait_for_hook_callback(
+    pid: u32,
+    process: &TargetProcessHandle,
+    completion: &HookCompletionEvent,
+    hooked_threads: &[u32],
+    posted_threads: &[u32],
+    initial_log_len: u64,
+) -> Result<HookWaitOutcome, String> {
+    let mut observed_handshake = false;
+    let mut callback_thread = 0;
+    let mut terminal_result = None;
+
+    for _ in 0..300 {
+        if process.has_exited()? {
+            return Err(format!(
+                "TARGET_EXITED: pid={pid} exited while waiting for SP_HookProc"
+            ));
+        }
+
+        if let Some(handshake) = read_speedpatch_handshake(pid)? {
+            observed_handshake |= handshake.hook_thread_id != 0;
+            callback_thread = handshake.hook_thread_id;
+            match classify_handshake(handshake) {
+                HandshakeProgress::Complete {
+                    callback_thread,
+                    state,
+                } => {
+                    dbg_log(&format!(
+                        "inject_via_windows_hook: initialized pid={pid} callback_thread={callback_thread} state={state:?} result=0x{:08x}",
+                        handshake.init_result
+                    ));
+                    terminal_result = Some(Ok(HookWaitOutcome::Complete {
+                        callback_thread,
+                        state,
+                    }));
+                }
+                HandshakeProgress::Failed {
+                    callback_thread,
+                    init_result,
+                } => {
+                    terminal_result = Some(Err(format!(
+                        "SP_HookProc initialization failed for pid={pid}, callback_thread={callback_thread}: {}",
+                        initialization_failure_detail(pid, init_result)
+                    )));
+                }
+                HandshakeProgress::Invalid(detail) => terminal_result = Some(Err(detail)),
+                HandshakeProgress::Pending => {
+                    set_injection_stage(pid, InjectionStage::Initializing);
+                }
+            }
+        }
+
+        let completion_signaled = match completion.is_signaled() {
+            Ok(signaled) => signaled,
+            Err(error) => {
+                dbg_log(&format!(
+                    "inject_via_windows_hook: completion event probe failed for pid={pid}: {error}"
+                ));
+                false
+            }
+        };
+
+        // When the DLL cannot create its handshake mapping, the completion
+        // event is the only protocol object left. It is emitted after
+        // CallNextHookEx, so it is sufficient to release the bridge-owned hook
+        // in this mapping-absent failure path.
+        let handshake_present = match read_speedpatch_handshake(pid) {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(error) => {
+                dbg_log(&format!(
+                    "inject_via_windows_hook: handshake probe failed after completion for pid={pid}: {error}"
+                ));
+                true
+            }
+        };
+
+        if terminal_result.is_some() {
+            return terminal_result.take().unwrap_or_else(|| {
+                Err(completed_without_terminal_handshake_detail(
+                    pid,
+                    callback_thread,
+                    initial_log_len,
+                ))
+            });
+        }
+        if completion_signaled && !handshake_present {
+            dbg_log(&format!(
+                "inject_via_windows_hook: completion event signaled without a handshake for pid={pid}"
+            ));
+            return Err(completed_without_terminal_handshake_detail(
+                pid,
+                callback_thread,
+                initial_log_len,
+            ));
+        }
+
+        if shutdown_requested() {
+            if observed_handshake || terminal_result.is_some() {
+                return Ok(HookWaitOutcome::Pending {
+                    callback_thread,
+                    detail: format!(
+                        "bridge shutdown is waiting for SP_HookProc initialization in pid={pid}"
+                    ),
+                });
+            }
+            return Err(format!(
+                "bridge shutdown interrupted SetWindowsHookExW injection before callback entry for pid={pid}, hooked_threads={hooked_threads:?}"
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    if process.has_exited()? {
+        return Err(format!(
+            "TARGET_EXITED: pid={pid} exited while waiting for SP_HookProc"
+        ));
+    }
+    if completion.is_signaled()? && read_speedpatch_handshake(pid)?.is_none() {
+        return terminal_result.take().unwrap_or_else(|| {
+            Err(completed_without_terminal_handshake_detail(
+                pid,
+                callback_thread,
+                initial_log_len,
+            ))
+        });
+    }
+    if observed_handshake || terminal_result.is_some() {
+        return Ok(HookWaitOutcome::Pending {
+            callback_thread,
+            detail: format!(
+                "SP_HookProc entered pid={pid} on thread={callback_thread}, but its kernel completion event is still pending after 15s"
+            ),
+        });
+    }
+
+    let native_detail = latest_speedpatch_install_failure(pid, initial_log_len)
+        .map(|line| format!(" Native DLL error: {line}"))
+        .unwrap_or_default();
+    Err(format!(
+        "SetWindowsHookExW installed for pid={pid}, hooked_threads={hooked_threads:?}, posted_threads={posted_threads:?}, but SP_HookProc did not publish its handshake within 15s.{native_detail} DLL log: {}",
+        std::env::temp_dir()
+            .join(format!("dzsspeedy-speedpatch-{pid}.log"))
+            .display()
+    ))
+}
+
+fn inject_via_windows_hook(pid: u32, dll_path: &str) -> Result<HookInjectionOutcome, String> {
+    let mut process = Some(TargetProcessHandle::open(pid)?);
+    let completion = HookCompletionEvent::create(pid)?;
+    let thread_ids = target_hook_threads(pid)?;
+    let log_path = std::env::temp_dir().join(format!("dzsspeedy-speedpatch-{pid}.log"));
+    let initial_log_len = std::fs::metadata(log_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    let dll_wide = to_wide(dll_path);
+    let local_module = unsafe { LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) }
+        .map_err(|error| format!("LoadLibraryW(local hook DLL {dll_path}) failed: {error:?}"))?;
+    let hook_proc = match unsafe { GetProcAddress(local_module, s!("SP_HookProc")) } {
+        Some(proc) => proc,
+        None => {
+            unsafe {
+                let _ = FreeLibrary(local_module);
+            }
+            return Err("GetProcAddress(SP_HookProc) failed".into());
+        }
+    };
+    let hook_proc = unsafe {
+        std::mem::transmute::<unsafe extern "system" fn() -> isize, WindowsHookProc>(hook_proc)
+    };
+
+    let mut installed = Vec::new();
+    let mut install_errors = Vec::new();
+    for &thread_id in &thread_ids {
+        match unsafe {
+            SetWindowsHookExW(
+                WH_GETMESSAGE,
+                Some(hook_proc),
+                HINSTANCE(local_module.0),
+                thread_id,
+            )
+        } {
+            Ok(hook) => installed.push(InstalledWindowsHook { hook, thread_id }),
+            Err(error) => install_errors.push(format!("thread={thread_id}: {error:?}")),
+        }
+    }
+    if installed.is_empty() {
+        unsafe {
+            let _ = FreeLibrary(local_module);
+        }
+        return Err(format!(
+            "SetWindowsHookExW(WH_GETMESSAGE, pid={pid}) failed for all candidates {:?}: {}",
+            thread_ids,
+            install_errors.join("; ")
+        ));
+    }
+    let hooks = InstalledWindowsHooks {
+        hooks: installed,
+        local_module: Some(local_module),
+    };
+    let mut hooks = hooks;
+    let hooked_threads = hooks
+        .hooks
+        .iter()
+        .map(|installed| installed.thread_id)
+        .collect::<Vec<_>>();
+    dbg_log(&format!(
+        "inject_via_windows_hook: installed pid={pid} candidates={thread_ids:?} hooked={hooked_threads:?} install_errors={install_errors:?}"
+    ));
+
+    let mut posted_threads = Vec::new();
+    let mut post_errors = Vec::new();
+    for installed in &hooks.hooks {
+        match unsafe { PostThreadMessageW(installed.thread_id, WM_NULL, None, None) } {
+            Ok(()) => posted_threads.push(installed.thread_id),
+            Err(error) => {
+                post_errors.push(format!("thread={}: {error:?}", installed.thread_id));
+            }
+        }
+    }
+    let wait_result = if posted_threads.is_empty() {
+        Err(format!(
+            "SetWindowsHookExW installed for pid={pid}, but PostThreadMessageW(WM_NULL) failed for all hooked threads {hooked_threads:?}: {}",
+            post_errors.join("; ")
+        ))
+    } else {
+        dbg_log(&format!(
+            "inject_via_windows_hook: woke pid={pid} posted={posted_threads:?} post_errors={post_errors:?}"
+        ));
+        wait_for_hook_callback(
+            pid,
+            process.as_ref().expect("target process handle missing"),
+            &completion,
+            &hooked_threads,
+            &posted_threads,
+            initial_log_len,
+        )
+    };
+
+    let wait_result = match wait_result {
+        Ok(HookWaitOutcome::Pending {
+            callback_thread,
+            detail,
+        }) => {
+            return Ok(HookInjectionOutcome::Pending {
+                process: process.take().expect("target process handle missing"),
+                callback_thread,
+                detail,
+                hooks: Some(hooks),
+                completion,
+                initial_log_len,
+            });
+        }
+        result => result,
+    };
+
+    let callback_finished = matches!(&wait_result, Ok(HookWaitOutcome::Complete { .. }))
+        || read_speedpatch_handshake(pid)
+            .ok()
+            .flatten()
+            .is_some_and(|handshake| handshake.callback_completed)
+        || (wait_result.is_err()
+            && completion.is_signaled().unwrap_or(false)
+            && matches!(read_speedpatch_handshake(pid), Ok(None)));
+    if !callback_finished {
+        let detail = match &wait_result {
+            Ok(HookWaitOutcome::Pending { detail, .. }) => detail.clone(),
+            Ok(HookWaitOutcome::Complete { .. }) => {
+                "SP_HookProc completed without a completion signal".to_string()
+            }
+            Err(error) => error.clone(),
+        };
+        let callback_thread = match &wait_result {
+            Ok(HookWaitOutcome::Complete {
+                callback_thread, ..
+            })
+            | Ok(HookWaitOutcome::Pending {
+                callback_thread, ..
+            }) => *callback_thread,
+            Err(_) => 0,
+        };
+        return Ok(HookInjectionOutcome::Pending {
+            process: process.take().expect("target process handle missing"),
+            callback_thread,
+            detail,
+            hooks: Some(hooks),
+            completion,
+            initial_log_len,
+        });
+    }
+
+    if let Err(cleanup_error) = hooks.cleanup() {
+        let wait_detail = match &wait_result {
+            Ok(HookWaitOutcome::Complete { .. }) => {
+                "SP_HookProc completed before hook cleanup failed".to_string()
+            }
+            Ok(HookWaitOutcome::Pending { detail, .. }) | Err(detail) => detail.clone(),
+        };
+        let detail = format!("{wait_detail}; hook cleanup remains pending: {cleanup_error}");
+        return Ok(HookInjectionOutcome::Pending {
+            process: process.take().expect("target process handle missing"),
+            callback_thread: match wait_result {
+                Ok(HookWaitOutcome::Complete {
+                    callback_thread, ..
+                })
+                | Ok(HookWaitOutcome::Pending {
+                    callback_thread, ..
+                }) => callback_thread,
+                Err(_) => 0,
+            },
+            detail,
+            hooks: Some(hooks),
+            completion,
+            initial_log_len,
+        });
+    }
+
+    if process
+        .as_ref()
+        .expect("target process handle missing")
+        .has_exited()?
+    {
+        return Err(format!(
+            "TARGET_EXITED: pid={pid} exited after hook cleanup"
+        ));
+    }
+
+    match wait_result {
+        Ok(HookWaitOutcome::Complete {
+            callback_thread,
+            state,
+        }) => {
+            dbg_log(&format!(
+                "hook cleanup complete for pid={pid}, callback_thread={callback_thread}, state={state:?}"
+            ));
+            Ok(HookInjectionOutcome::Complete {
+                callback_thread,
+                state,
+            })
+        }
+        Ok(HookWaitOutcome::Pending {
+            callback_thread,
+            detail,
+        }) => Ok(HookInjectionOutcome::Pending {
+            process: process.take().expect("target process handle missing"),
+            callback_thread,
+            detail,
+            hooks: None,
+            completion,
+            initial_log_len,
+        }),
+        Err(error) => {
+            if process
+                .as_ref()
+                .expect("target process handle missing")
+                .has_exited()?
+            {
+                return Err(format!(
+                    "TARGET_EXITED: pid={pid} exited after hook callback"
+                ));
+            }
+
+            match read_speedpatch_handshake(pid)? {
+                Some(handshake) => match classify_handshake(handshake) {
+                    HandshakeProgress::Complete {
+                        callback_thread,
+                        state,
+                    } => Ok(HookInjectionOutcome::Complete {
+                        callback_thread,
+                        state,
+                    }),
+                    HandshakeProgress::Failed {
+                        callback_thread,
+                        init_result,
+                    } => Err(format!(
+                        "SP_HookProc initialization failed for pid={pid}, callback_thread={callback_thread}: {}",
+                        initialization_failure_detail(pid, init_result)
+                    )),
+                    HandshakeProgress::Invalid(detail) => Err(detail),
+                    HandshakeProgress::Pending => Ok(HookInjectionOutcome::Pending {
+                        process: process.take().expect("target process handle missing"),
+                        callback_thread: handshake.hook_thread_id,
+                        detail: error,
+                        hooks: None,
+                        completion,
+                        initial_log_len,
+                    }),
+                },
+                None => {
+                    let dll_name = speedpatch_dll(BRIDGE_IS64);
+                    match find_remote_module(pid, dll_name, Some(dll_path))? {
+                        Some(module) => Ok(HookInjectionOutcome::Pending {
+                            process: process.take().expect("target process handle missing"),
+                            callback_thread: 0,
+                            detail: format!(
+                                "{error}; {dll_name} remains loaded at 0x{:x}, so the kernel completion event is still being monitored",
+                                module.base
+                            ),
+                            hooks: None,
+                            completion,
+                            initial_log_len,
+                        }),
+                        None => {
+                            if process
+                                .as_ref()
+                                .expect("target process handle missing")
+                                .has_exited()?
+                            {
+                                Err(format!(
+                                    "TARGET_EXITED: pid={pid} exited after hook cleanup"
+                                ))
+                            } else {
+                                Err(error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct PendingInjectionMonitor {
+    pid: u32,
+    process: TargetProcessHandle,
+    operation: RemoteOperationLease,
+    pending_detail: String,
+    hooks: Option<InstalledWindowsHooks>,
+    completion: HookCompletionEvent,
+    dll_path: String,
+    initial_log_len: u64,
+}
+
+fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
+    std::thread::spawn(move || {
+        let PendingInjectionMonitor {
+            pid,
+            process,
+            operation,
+            pending_detail,
+            mut hooks,
+            completion,
+            dll_path,
+            initial_log_len,
+        } = monitor;
+        let _operation = operation;
+        let mut terminal: Option<Result<(u32, SpeedpatchState), String>> = None;
+        let mut terminal_without_completion = false;
+        let mut last_cleanup_error = None;
+        loop {
+            match process.has_exited() {
+                Ok(true) => {
+                    if let Some(mut owned_hooks) = hooks.take() {
+                        owned_hooks.release_after_target_exit();
+                    }
+                    clear_injection_stage(pid);
+                    clear_injection_failure(pid);
+                    untrack_target(pid);
+                    dbg_log(&format!(
+                        "pending hook monitor: TARGET_EXITED pid={pid} before terminal handshake"
+                    ));
+                    return;
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    dbg_log(&format!("pending hook monitor: {error}"));
+                }
+            }
+
+            let callback_completed = match read_speedpatch_handshake(pid) {
+                Ok(Some(handshake)) => handshake.callback_completed,
+                Ok(None) | Err(_) => false,
+            };
+            let completion_signaled = match completion.is_signaled() {
+                Ok(signaled) => signaled,
+                Err(error) => {
+                    dbg_log(&format!(
+                    "pending hook monitor: completion event probe failed for pid={pid}: {error}"
+                ));
+                    false
+                }
+            };
+            if completion_signaled && !callback_completed {
+                dbg_log(&format!(
+                "pending hook monitor: completion event signaled after callback return before marker for pid={pid}"
+            ));
+            }
+            let handshake_absent = matches!(read_speedpatch_handshake(pid), Ok(None));
+            let callback_finished = callback_completed || (completion_signaled && handshake_absent);
+
+            let mut cleanup_complete = false;
+            if callback_finished {
+                if let Some(owned_hooks) = hooks.as_mut() {
+                    match owned_hooks.cleanup() {
+                        Ok(()) => {
+                            cleanup_complete = true;
+                        }
+                        Err(error) => {
+                            if last_cleanup_error.as_deref() != Some(error.as_str()) {
+                                dbg_log(&format!(
+                                "pending hook monitor: hook cleanup still pending for pid={pid}: {error}"
+                            ));
+                                last_cleanup_error = Some(error);
+                            }
+                        }
+                    }
+                }
+            }
+            if cleanup_complete {
+                hooks = None;
+                last_cleanup_error = None;
+                dbg_log(&format!(
+                    "pending hook monitor: hook cleanup completed for pid={pid}"
+                ));
+            }
+
+            if terminal.is_none() {
+                match read_speedpatch_handshake(pid) {
+                    Ok(Some(handshake)) => match classify_handshake(handshake) {
+                        HandshakeProgress::Complete {
+                            callback_thread,
+                            state,
+                        } => terminal = Some(Ok((callback_thread, state))),
+                        HandshakeProgress::Failed {
+                            callback_thread,
+                            init_result,
+                        } => {
+                            terminal = Some(Err(format!(
+                                "SP_HookProc initialization failed for pid={pid}, callback_thread={callback_thread}: {}",
+                                initialization_failure_detail(pid, init_result)
+                            )));
+                        }
+                        HandshakeProgress::Invalid(detail) => terminal = Some(Err(detail)),
+                        HandshakeProgress::Pending => {
+                            set_injection_stage(pid, InjectionStage::Initializing);
+                            if callback_finished {
+                                terminal = Some(Err(completed_without_terminal_handshake_detail(
+                                    pid,
+                                    handshake.hook_thread_id,
+                                    initial_log_len,
+                                )));
+                            }
+                        }
+                    },
+                    Ok(None) if hooks.is_none() => {
+                        if callback_finished {
+                            terminal = Some(Err(completed_without_terminal_handshake_detail(
+                                pid,
+                                0,
+                                initial_log_len,
+                            )));
+                        } else {
+                            let dll_name = speedpatch_dll(BRIDGE_IS64);
+                            match find_remote_module(pid, dll_name, Some(&dll_path)) {
+                                    Ok(None) => match process.has_exited() {
+                                        Ok(true) => {
+                                            clear_injection_stage(pid);
+                                            clear_injection_failure(pid);
+                                            untrack_target(pid);
+                                            dbg_log(&format!(
+                                                "pending hook monitor: TARGET_EXITED pid={pid} during module probe"
+                                            ));
+                                            return;
+                                        }
+                                        Ok(false) => {
+                                            terminal = Some(Err(pending_detail.clone()));
+                                            terminal_without_completion = true;
+                                        }
+                                        Err(error) => dbg_log(&format!(
+                                            "pending hook monitor: target recheck failed for pid={pid}: {error}"
+                                        )),
+                                    },
+                                    Ok(Some(_)) => {}
+                                    Err(error) => dbg_log(&format!(
+                                        "pending hook monitor: module probe failed for pid={pid}: {error}"
+                                    )),
+                                }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        dbg_log(&format!(
+                            "pending hook monitor: handshake read failed for pid={pid}: {error}"
+                        ));
+                    }
+                }
+            }
+
+            if hooks.is_none() && (callback_finished || terminal_without_completion) {
+                if let Some(result) = terminal.take() {
+                    match process.has_exited() {
+                        Ok(true) => {
+                            clear_injection_stage(pid);
+                            clear_injection_failure(pid);
+                            untrack_target(pid);
+                            dbg_log(&format!(
+                                "pending hook monitor: TARGET_EXITED pid={pid} before terminal result publication"
+                            ));
+                            return;
+                        }
+                        Ok(false) => {}
+                        Err(error) => {
+                            dbg_log(&format!(
+                                "pending hook monitor: terminal target recheck failed for pid={pid}: {error}"
+                            ));
+                            terminal = Some(result);
+                            std::thread::sleep(std::time::Duration::from_millis(50));
+                            continue;
+                        }
+                    }
+                    match result {
+                        Ok((callback_thread, state)) => {
+                            finish_injection_success(pid);
+                            dbg_log(&format!(
+                                "pending hook monitor: pid={pid} callback_thread={callback_thread} completed with {state:?}"
+                            ));
+                        }
+                        Err(detail) => {
+                            record_injection_failure(pid, detail.clone());
+                            track_target(pid);
+                            dbg_log(&format!("pending hook monitor: {detail}"));
+                        }
+                    }
+                    return;
+                }
+            }
+
+            if shutdown_requested() {
+                if let Err(error) = write_speedpatch_enabled(pid, false) {
+                    dbg_log(&format!(
+                        "pending hook monitor: shutdown disable pending for pid={pid}: {error}"
+                    ));
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    });
+}
+
+/// Inject using the one supported same-architecture GUI-hook path.
+fn do_inject(pid: u32) -> Result<(), String> {
+    let operation = RemoteOperationLease::try_acquire()?;
     if let Some(stage) = injection_stage(pid) {
         return Err(format!(
             "INJECTION_PENDING: the existing {:?} stage is still running for pid={pid}",
@@ -535,7 +1719,8 @@ fn do_inject(pid: u32) -> Result<(), String> {
     }
 
     let existing_module = find_remote_module(pid, dll_name, Some(&dll_str))?;
-    let state = read_speedpatch_state(pid)?;
+    let handshake = read_speedpatch_handshake(pid)?;
+    let state = handshake.map(|value| value.state);
     match (existing_module.as_ref(), state) {
         (Some(_), Some(SpeedpatchState::Enabled)) => {
             clear_injection_failure(pid);
@@ -544,7 +1729,7 @@ fn do_inject(pid: u32) -> Result<(), String> {
         }
         (Some(_), Some(SpeedpatchState::Disabled)) => {
             clear_injection_failure(pid);
-            return do_enable(pid);
+            return do_enable_inner(pid);
         }
         (Some(_), Some(SpeedpatchState::Initializing)) => {
             set_injection_stage(pid, InjectionStage::Initializing);
@@ -555,11 +1740,10 @@ fn do_inject(pid: u32) -> Result<(), String> {
         }
         (Some(_), Some(SpeedpatchState::Failed)) => {
             untrack_target(pid);
-            return Err(injection_failure(pid).unwrap_or_else(|| {
-                format!(
-                    "SP_Initialize failed for pid={pid}; the target must be restarted before injection can be retried"
-                )
-            }));
+            return Err(persisted_initialization_failure(
+                pid,
+                handshake.expect("failed state without handshake"),
+            ));
         }
         (None, Some(state)) => {
             untrack_target(pid);
@@ -573,7 +1757,7 @@ fn do_inject(pid: u32) -> Result<(), String> {
                 .map(|detail| format!(" Previous failure: {detail}."))
                 .unwrap_or_default();
             return Err(format!(
-                "{} is already loaded in pid={pid} from {}, but its status mapping is absent. Automatic recovery is disabled so injection always follows one fixed LoadLibraryW -> SP_Initialize chain.{previous} Restart the target process before retrying.",
+                "{} is already loaded in pid={pid} from {}, but its status mapping is absent. Automatic recovery is disabled so injection always follows one fixed SetWindowsHookExW -> SP_HookProc chain.{previous} Restart the target process before retrying.",
                 dll_name, module.path
             ));
         }
@@ -582,200 +1766,59 @@ fn do_inject(pid: u32) -> Result<(), String> {
         }
     }
 
-    let h_proc = unsafe {
-        OpenProcess(
-            PROCESS_CREATE_THREAD
-                | PROCESS_QUERY_INFORMATION
-                | PROCESS_VM_OPERATION
-                | PROCESS_VM_WRITE
-                | PROCESS_VM_READ,
-            false,
-            pid,
-        )
-    }
-    .map_err(|e| {
-        format!(
-            "OpenProcess(pid={pid}) failed: {e:?}. If already admin, target may be protected or higher integrity."
-        )
-    })?;
-
-    let operation = RemoteOperationLease::new();
+    track_target(pid);
     set_injection_stage(pid, InjectionStage::Loading);
-    match inject_via_load_library_w(pid, &h_proc, &dll_str, dll_name) {
-        Ok(module) => {
-            set_injection_stage(pid, InjectionStage::Initializing);
-            match finish_loaded_module(pid, h_proc, &dll_str, module.base, operation)? {
-                FinishLoadedOutcome::Complete => Ok(()),
-                FinishLoadedOutcome::Pending(detail) => Err(format!("INJECTION_PENDING: {detail}")),
-            }
-        }
-        Err(RemoteLoadError::Failed(detail)) => {
-            clear_injection_stage(pid);
-            unsafe {
-                let _ = CloseHandle(h_proc);
-            }
-            Err(format!(
-                "CreateRemoteThread + LoadLibraryW failed for pid={pid}, dll={dll_str}: {detail}"
-            ))
-        }
-        Err(RemoteLoadError::Pending {
-            detail,
-            thread,
-            remote_mem,
+    match inject_via_windows_hook(pid, &dll_str) {
+        Ok(HookInjectionOutcome::Complete {
+            callback_thread,
+            state,
         }) => {
-            reap_remote_load_async(
-                pid,
-                h_proc,
-                thread,
-                remote_mem,
-                dll_str.clone(),
-                dll_name.to_string(),
-                operation,
-            );
-            Err(format!(
-                "INJECTION_PENDING: CreateRemoteThread + LoadLibraryW is still running for pid={pid}, dll={dll_str}: {detail}"
-            ))
-        }
-    }
-}
-
-fn finish_loaded_module(
-    pid: u32,
-    h_proc: HANDLE,
-    dll_path: &str,
-    remote_module: usize,
-    operation: RemoteOperationLease,
-) -> Result<FinishLoadedOutcome, String> {
-    if let Err(init_error) = initialize_remote_speedpatch(&h_proc, dll_path, remote_module) {
-        if let Some(thread) = init_error.pending_thread {
-            set_injection_stage(pid, InjectionStage::Initializing);
-            reap_remote_init_async(pid, h_proc, thread, remote_module, operation);
-            return Ok(FinishLoadedOutcome::Pending(init_error.detail));
-        }
-
-        let cleanup = if init_error.safe_to_unload {
-            match remote_free_library(pid, &h_proc, remote_module) {
-                Ok(()) => "; the failed load reference was released".to_string(),
-                Err(error) => format!("; failed to release the loaded DLL: {error}"),
+            finish_injection_success(pid);
+            dbg_log(&format!(
+                "do_inject pid={pid}: SetWindowsHookExW + SP_HookProc complete thread={callback_thread} state={state:?}"
+            ));
+            if state == SpeedpatchState::Enabled {
+                Ok(())
+            } else {
+                Err(format!(
+                    "INJECTION_DISABLED: SP_HookProc initialized pid={pid} on thread={callback_thread}, but acceleration was disabled before completion"
+                ))
             }
-        } else {
-            "; DLL remains loaded because initialization completion is uncertain".to_string()
-        };
-
-        unsafe {
-            let _ = CloseHandle(h_proc);
         }
-        let detail = format!(
-            "LoadLibraryW loaded speedpatch for pid={pid}, but SP_Initialize failed: {}{}",
-            init_error.detail, cleanup
-        );
-        record_injection_failure(pid, detail.clone());
-        return Err(detail);
-    }
-
-    unsafe {
-        let _ = CloseHandle(h_proc);
-    }
-    finish_injection_success(pid);
-    dbg_log(&format!(
-        "do_inject pid={pid}: LoadLibraryW + SP_Initialize OK"
-    ));
-    Ok(FinishLoadedOutcome::Complete)
-}
-
-fn initialize_remote_speedpatch(
-    h_proc: &HANDLE,
-    dll_path: &str,
-    remote_module: usize,
-) -> Result<(), RemoteInitError> {
-    let dll_name = speedpatch_dll(BRIDGE_IS64);
-    let dll_wide = to_wide(dll_path);
-    let local_module =
-        unsafe { LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) }.map_err(|e| {
-            RemoteInitError {
-                detail: format!("LoadLibraryW(local {dll_name}) failed: {e:?}"),
-                safe_to_unload: true,
-                pending_thread: None,
-            }
-        })?;
-
-    let init_rva = unsafe { GetProcAddress(local_module, s!("SP_Initialize")) }
-        .ok_or_else(|| "GetProcAddress(SP_Initialize) failed".to_string())
-        .and_then(|proc| {
-            (proc as usize)
-                .checked_sub(local_module.0 as usize)
-                .ok_or_else(|| "SP_Initialize address is below local module base".to_string())
-        });
-    unsafe {
-        let _ = FreeLibrary(local_module);
-    }
-    let init_rva = init_rva.map_err(|detail| RemoteInitError {
-        detail,
-        safe_to_unload: true,
-        pending_thread: None,
-    })?;
-    let remote_init = remote_module + init_rva;
-
-    let h_thread = unsafe {
-        CreateRemoteThread(
-            *h_proc,
-            None,
-            0,
-            Some(remote_thread_start(remote_init)),
-            None,
-            0,
-            None,
-        )
-    }
-    .map_err(|e| RemoteInitError {
-        detail: format!("CreateRemoteThread(SP_Initialize) failed: {e:?}"),
-        safe_to_unload: true,
-        pending_thread: None,
-    })?;
-
-    let wait_result = unsafe { WaitForSingleObject(h_thread, 15_000) };
-    if wait_result == WAIT_TIMEOUT {
-        return Err(RemoteInitError {
-            detail: "SP_Initialize exceeded 15s and is still running".into(),
-            safe_to_unload: false,
-            pending_thread: Some(h_thread),
-        });
-    }
-    if wait_result != WAIT_OBJECT_0 {
-        let detail = if wait_result == WAIT_FAILED {
-            let gle = unsafe { GetLastError() };
-            format!("WaitForSingleObject(SP_Initialize) failed: gle={}", gle.0)
-        } else {
-            format!(
-                "WaitForSingleObject(SP_Initialize) returned 0x{:08x}",
-                wait_result.0
-            )
-        };
-        unsafe {
-            let _ = CloseHandle(h_thread);
-        }
-        return Err(RemoteInitError {
+        Ok(HookInjectionOutcome::Pending {
+            process,
+            callback_thread,
             detail,
-            safe_to_unload: false,
-            pending_thread: None,
-        });
+            hooks,
+            completion,
+            initial_log_len,
+        }) => {
+            let response =
+                format!("INJECTION_PENDING: {detail}; callback_thread={callback_thread}");
+            set_injection_stage(pid, InjectionStage::Initializing);
+            monitor_pending_injection(PendingInjectionMonitor {
+                pid,
+                process,
+                operation,
+                pending_detail: response.clone(),
+                hooks,
+                completion,
+                dll_path: dll_str,
+                initial_log_len,
+            });
+            Err(response)
+        }
+        Err(detail) => {
+            let failure = format!(
+                "SetWindowsHookExW injection failed for pid={pid}, dll={dll_str}: {detail}"
+            );
+            record_injection_failure(pid, failure.clone());
+            Err(failure)
+        }
     }
-
-    let mut exit_code = 0u32;
-    let exit_result = unsafe { GetExitCodeThread(h_thread, &mut exit_code) };
-    unsafe {
-        let _ = CloseHandle(h_thread);
-    }
-    exit_result.map_err(|e| RemoteInitError {
-        detail: format!("GetExitCodeThread(SP_Initialize) failed: {e:?}"),
-        safe_to_unload: false,
-        pending_thread: None,
-    })?;
-
-    decode_initialize_exit_code(exit_code)
 }
 
-fn decode_initialize_exit_code(code: u32) -> Result<(), RemoteInitError> {
+fn decode_initialize_exit_code(code: u32) -> Result<(), InitializationError> {
     let kind = code & 0xff00_0000;
     let detail = match kind {
         0x0100_0000 => format!(
@@ -810,6 +1853,14 @@ fn decode_initialize_exit_code(code: u32) -> Result<(), RemoteInitError> {
         0x0700_0000 => {
             "a previous hook-enable rollback left speedpatch non-retryable; restart the target process before injecting again".into()
         }
+        0x0800_0000 => format!(
+            "speedpatch hook callback could not acquire its DLL self-reference: win32_error={}",
+            code & 0x00ff_ffff
+        ),
+        0x0900_0000 => format!(
+            "speedpatch hook callback could not open its bridge completion event: win32_error={}",
+            code & 0x00ff_ffff
+        ),
         _ => match code {
             0 => return Ok(()),
             1 => "MinHook initialization failed".into(),
@@ -820,13 +1871,7 @@ fn decode_initialize_exit_code(code: u32) -> Result<(), RemoteInitError> {
         },
     };
 
-    let safe_to_unload = matches!(kind, 0x0100_0000 | 0x0200_0000 | 0x0400_0000 | 0x0500_0000)
-        || matches!(code, 1..=3);
-    Err(RemoteInitError {
-        detail,
-        safe_to_unload,
-        pending_thread: None,
-    })
+    Err(InitializationError { detail })
 }
 
 fn hook_name(id: u32) -> &'static str {
@@ -977,549 +2022,24 @@ fn find_remote_module(
     Ok(module)
 }
 
-fn confirm_remote_module(
-    pid: u32,
-    module_name: &str,
-    expected_path: &str,
-) -> Result<RemoteModule, String> {
-    let mut last_error = None;
-    for attempt in 0..50 {
-        match find_remote_module(pid, module_name, Some(expected_path)) {
-            Ok(Some(module)) => return Ok(module),
-            Ok(None) => {
-                last_error = Some(format!(
-                    "{module_name} is not present in the module snapshot"
-                ));
-            }
-            Err(error) => last_error = Some(error),
-        }
-        if attempt < 49 {
-            std::thread::sleep(std::time::Duration::from_millis(20));
-        }
-    }
-    Err(last_error.unwrap_or_else(|| format!("could not confirm {module_name} in pid={pid}")))
-}
-
-fn local_module_containing_address(address: usize) -> Result<(String, usize), String> {
-    let pid = std::process::id();
-    let snapshot = create_module_snapshot(pid)?
-        .ok_or_else(|| format!("could not snapshot bridge modules for pid={pid}"))?;
-    let mut entry = MODULEENTRY32W {
-        dwSize: std::mem::size_of::<MODULEENTRY32W>() as u32,
-        ..Default::default()
-    };
-
-    if let Err(error) = unsafe { Module32FirstW(snapshot, &mut entry) } {
-        unsafe {
-            let _ = CloseHandle(snapshot);
-        }
-        return Err(format!(
-            "Module32FirstW(bridge pid={pid}) failed while resolving address 0x{address:x}: {error:?}"
-        ));
-    }
-
-    let result = loop {
-        let base = entry.modBaseAddr as usize;
-        let end = base.saturating_add(entry.modBaseSize as usize);
-        if address >= base && address < end {
-            break Ok((module_text(&entry.szModule), base));
-        }
-
-        match unsafe { Module32NextW(snapshot, &mut entry) } {
-            Ok(()) => {}
-            Err(error) if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) => {
-                break Err(format!(
-                    "no bridge module contains procedure address 0x{address:x}"
-                ));
-            }
-            Err(error) => {
-                break Err(format!(
-                    "Module32NextW(bridge pid={pid}) failed while resolving address 0x{address:x}: {error:?}"
-                ));
-            }
-        }
-    };
-
-    unsafe {
-        let _ = CloseHandle(snapshot);
-    }
-    result
-}
-
-fn remote_module_base(pid: u32, module_name: &str) -> Result<usize, String> {
-    find_remote_module(pid, module_name, None)?
-        .map(|module| module.base)
-        .ok_or_else(|| format!("module {module_name} not found in pid={pid}"))
-}
-
-fn remote_system_proc(pid: u32, proc_name: &str) -> Result<(usize, usize, usize), String> {
-    let kernel32_w = to_wide("kernel32.dll");
-    let local_kernel32 = unsafe { GetModuleHandleW(PCWSTR::from_raw(kernel32_w.as_ptr())) }
-        .map_err(|e| format!("GetModuleHandleW(kernel32.dll): {e:?}"))?;
-    let proc_cstr = std::ffi::CString::new(proc_name).unwrap();
-    let local_proc = unsafe {
-        GetProcAddress(
-            local_kernel32,
-            PCSTR::from_raw(proc_cstr.as_ptr() as *const u8),
-        )
-    }
-    .ok_or_else(|| format!("GetProcAddress {proc_name}"))? as usize;
-    // Forwarded kernel32 exports may resolve inside KernelBase on some Windows
-    // builds. Compute the RVA from the module that actually owns the address.
-    let (owner_name, local_base) = local_module_containing_address(local_proc)?;
-    let rva = local_proc
-        .checked_sub(local_base)
-        .ok_or_else(|| format!("{proc_name} address is below local {owner_name} base"))?;
-    let remote_base = remote_module_base(pid, &owner_name)?;
-    dbg_log(&format!(
-        "remote_system_proc: pid={pid} proc={proc_name} owner={owner_name} local=0x{local_proc:x} rva=0x{rva:x} remote=0x{:x}",
-        remote_base + rva
-    ));
-    Ok((remote_base + rva, local_proc, rva))
-}
-fn inject_via_load_library_w(
-    pid: u32,
-    h_proc: &HANDLE,
-    dll_path: &str,
-    dll_name: &str,
-) -> Result<RemoteModule, RemoteLoadError> {
-    let path_bytes: Vec<u8> = dll_path
-        .encode_utf16()
-        .flat_map(|c| c.to_le_bytes())
-        .chain([0u8, 0u8])
-        .collect();
-
-    let path_len = path_bytes.len();
-    let (load_lib, local_load_lib, load_lib_rva) =
-        remote_system_proc(pid, "LoadLibraryW").map_err(RemoteLoadError::Failed)?;
-
-    let remote_mem = unsafe {
-        VirtualAllocEx(
-            *h_proc,
-            None,
-            path_len,
-            MEM_COMMIT | MEM_RESERVE,
-            PAGE_READWRITE,
-        )
-    };
-
-    if remote_mem.is_null() {
-        let gle = unsafe { GetLastError() };
-
-        return Err(RemoteLoadError::Failed(format!(
-            "VirtualAllocEx failed: gle={} (0x{:08x})",
-            gle.0, gle.0
-        )));
-    }
-
-    let mut written = 0usize;
-    let write_result = unsafe {
-        WriteProcessMemory(
-            *h_proc,
-            remote_mem,
-            path_bytes.as_ptr() as _,
-            path_len,
-            Some(&mut written),
-        )
-    };
-    if let Err(e) = write_result {
-        unsafe {
-            let _ = VirtualFreeEx(*h_proc, remote_mem, 0, MEM_RELEASE);
-        }
-        return Err(RemoteLoadError::Failed(format!(
-            "WriteProcessMemory(path) failed: {e:?}"
-        )));
-    }
-    if written != path_len {
-        unsafe {
-            let _ = VirtualFreeEx(*h_proc, remote_mem, 0, MEM_RELEASE);
-        }
-        return Err(RemoteLoadError::Failed(format!(
-            "WriteProcessMemory(path) wrote {written}/{path_len} bytes"
-        )));
-    }
-
-    dbg_log(&format!(
-        "inject_via_load_library_w: pid={} local=0x{:x} rva=0x{:x} remote=0x{:x}",
-        pid, local_load_lib, load_lib_rva, load_lib
-    ));
-    let h_thread = unsafe {
-        CreateRemoteThread(
-            *h_proc,
-            None,
-            0,
-            Some(remote_thread_start(load_lib)),
-            Some(remote_mem),
-            0,
-            None,
-        )
-    }
-    .map_err(|e| {
-        unsafe {
-            let _ = VirtualFreeEx(*h_proc, remote_mem, 0, MEM_RELEASE);
-        }
-
-        RemoteLoadError::Failed(format!("CreateRemoteThread failed: {e:?}"))
-    })?;
-
-    let wait_result = unsafe { WaitForSingleObject(h_thread, 15_000) };
-    if wait_result != WAIT_OBJECT_0 {
-        let detail = if wait_result == WAIT_TIMEOUT {
-            "remote LoadLibrary thread timed out after 15s".to_string()
-        } else if wait_result == WAIT_FAILED {
-            let gle = unsafe { GetLastError() };
-            format!(
-                "WaitForSingleObject failed: gle={} (0x{:08x})",
-                gle.0, gle.0
-            )
-        } else {
-            format!(
-                "WaitForSingleObject returned unexpected value 0x{:08x}",
-                wait_result.0
-            )
-        };
-
-        return Err(RemoteLoadError::Pending {
-            detail,
-            thread: h_thread,
-            remote_mem: remote_mem as usize,
-        });
-    }
-
-    let mut exit_code = 0u32;
-    let exit_result = unsafe { GetExitCodeThread(h_thread, &mut exit_code) };
-
-    unsafe {
-        let _ = VirtualFreeEx(*h_proc, remote_mem, 0, MEM_RELEASE);
-
-        let _ = CloseHandle(h_thread);
-    }
-
-    let exit_detail = match exit_result {
-        Ok(()) => format!("remote thread exit_code=0x{exit_code:08x}"),
-        Err(error) => format!("GetExitCodeThread failed: {error:?}"),
-    };
-
-    // GetExitCodeThread is only 32-bit and truncates HMODULE on x64. Confirm
-    // success from the target's module list instead of interpreting that value.
-    let module = confirm_remote_module(pid, dll_name, dll_path).map_err(|detail| {
-        RemoteLoadError::Failed(format!(
-            "LoadLibraryW thread completed but {dll_name} could not be confirmed in pid={pid} ({exit_detail}): {detail}. The target loader rejected the DLL, a dependency is missing, or target policy blocked it."
-        ))
-    })?;
-
-    dbg_log(&format!(
-        "inject_via_load_library_w: module confirmed at 0x{:x}, path={}, {}",
-        module.base, module.path, exit_detail
-    ));
-    Ok(module)
-}
-
-fn reap_remote_load_async(
-    pid: u32,
-    h_proc: HANDLE,
-    h_thread: HANDLE,
-    remote_mem: usize,
-    dll_path: String,
-    dll_name: String,
-    operation: RemoteOperationLease,
-) {
-    let process_raw = h_proc.0 as usize;
-    let thread_raw = h_thread.0 as usize;
-    std::thread::spawn(move || unsafe {
-        let process = HANDLE(process_raw as *mut std::ffi::c_void);
-        let thread = HANDLE(thread_raw as *mut std::ffi::c_void);
-        let wait_result = WaitForSingleObject(thread, u32::MAX);
-        if wait_result != WAIT_OBJECT_0 {
-            let detail = format!(
-                "remote LoadLibraryW wait failed for pid={pid}: result=0x{:08x}; path memory was retained because thread completion is unknown",
-                wait_result.0
-            );
-            record_injection_failure(pid, detail.clone());
-            dbg_log(&detail);
-            let _ = CloseHandle(thread);
-            let _ = CloseHandle(process);
-            return;
-        }
-
-        let mut exit_code = 0u32;
-        let exit_detail = match GetExitCodeThread(thread, &mut exit_code) {
-            Ok(()) => format!("remote thread exit_code=0x{exit_code:08x}"),
-            Err(error) => format!("GetExitCodeThread failed: {error:?}"),
-        };
-        let _ = VirtualFreeEx(process, remote_mem as *mut std::ffi::c_void, 0, MEM_RELEASE);
-        let _ = CloseHandle(thread);
-
-        let module = match confirm_remote_module(pid, &dll_name, &dll_path) {
-            Ok(module) => module,
-            Err(error) => {
-                let detail = format!(
-                    "LoadLibraryW completed asynchronously for pid={pid}, but {dll_name} could not be confirmed ({exit_detail}): {error}"
-                );
-                record_injection_failure(pid, detail.clone());
-                dbg_log(&detail);
-                let _ = CloseHandle(process);
-                return;
-            }
-        };
-
-        set_injection_stage(pid, InjectionStage::Initializing);
-        match finish_loaded_module(pid, process, &dll_path, module.base, operation) {
-            Ok(FinishLoadedOutcome::Complete) => dbg_log(&format!(
-                "remote LoadLibraryW continuation: pid={pid} completed SP_Initialize successfully"
-            )),
-            Ok(FinishLoadedOutcome::Pending(detail)) => dbg_log(&format!(
-                "remote LoadLibraryW continuation: pid={pid} SP_Initialize remains pending: {detail}"
-            )),
-            Err(error) => dbg_log(&format!(
-                "remote LoadLibraryW continuation: pid={pid} SP_Initialize failed: {error}"
-            )),
-        }
-    });
-}
-
-fn reap_remote_init_async(
-    pid: u32,
-    h_proc: HANDLE,
-    h_thread: HANDLE,
-    remote_module: usize,
-    _operation: RemoteOperationLease,
-) {
-    let process_raw = h_proc.0 as usize;
-    let thread_raw = h_thread.0 as usize;
-    std::thread::spawn(move || unsafe {
-        let process = HANDLE(process_raw as *mut std::ffi::c_void);
-        let thread = HANDLE(thread_raw as *mut std::ffi::c_void);
-        let wait_result = WaitForSingleObject(thread, u32::MAX);
-        if wait_result == WAIT_OBJECT_0 {
-            let mut exit_code = 0u32;
-            match GetExitCodeThread(thread, &mut exit_code) {
-                Ok(()) => match decode_initialize_exit_code(exit_code) {
-                    Ok(()) => {
-                        finish_injection_success(pid);
-                        dbg_log(&format!(
-                            "remote SP_Initialize reaper: pid={pid} completed successfully"
-                        ));
-                    }
-                    Err(error) => {
-                        let cleanup = if error.safe_to_unload {
-                            remote_free_library(pid, &process, remote_module)
-                                .map(|_| "load reference released".to_string())
-                                .unwrap_or_else(|cleanup_error| {
-                                    format!("load reference cleanup failed: {cleanup_error}")
-                                })
-                        } else {
-                            "DLL left loaded".to_string()
-                        };
-                        let detail = format!(
-                            "remote SP_Initialize failed for pid={pid}: {}; {cleanup}",
-                            error.detail
-                        );
-                        record_injection_failure(pid, detail.clone());
-                        dbg_log(&detail);
-                    }
-                },
-                Err(error) => {
-                    let detail = format!(
-                        "remote SP_Initialize completed for pid={pid}, but GetExitCodeThread failed: {error:?}"
-                    );
-                    record_injection_failure(pid, detail.clone());
-                    dbg_log(&detail);
-                }
-            }
-        } else {
-            let detail = format!(
-                "remote SP_Initialize reaper: pid={pid} wait failed result=0x{:08x}",
-                wait_result.0
-            );
-            record_injection_failure(pid, detail.clone());
-            dbg_log(&detail);
-        }
-        let _ = CloseHandle(thread);
-        let _ = CloseHandle(process);
-    });
-}
-
-fn reap_thread_handle_async(label: String, h_thread: HANDLE) {
-    let thread_raw = h_thread.0 as usize;
-    std::thread::spawn(move || unsafe {
-        let thread = HANDLE(thread_raw as *mut std::ffi::c_void);
-        let wait_result = WaitForSingleObject(thread, u32::MAX);
-        dbg_log(&format!(
-            "{label} reaper finished with wait result=0x{:08x}",
-            wait_result.0
-        ));
-        let _ = CloseHandle(thread);
-    });
-}
-
-fn remote_free_library(pid: u32, h_proc: &HANDLE, remote_module: usize) -> Result<(), String> {
-    let (free_library, _, _) = remote_system_proc(pid, "FreeLibrary")?;
-    let h_thread = unsafe {
-        CreateRemoteThread(
-            *h_proc,
-            None,
-            0,
-            Some(remote_thread_start(free_library)),
-            Some(remote_module as *mut std::ffi::c_void),
-            0,
-            None,
-        )
-    }
-    .map_err(|error| format!("CreateRemoteThread(FreeLibrary) failed: {error:?}"))?;
-
-    let wait_result = unsafe { WaitForSingleObject(h_thread, 5_000) };
-    if wait_result != WAIT_OBJECT_0 {
-        let detail = if wait_result == WAIT_TIMEOUT {
-            "FreeLibrary timed out after 5s; cleanup continues asynchronously".to_string()
-        } else if wait_result == WAIT_FAILED {
-            let gle = unsafe { GetLastError() };
-            format!(
-                "WaitForSingleObject(FreeLibrary) failed: gle={}; cleanup ownership transferred to a reaper",
-                gle.0
-            )
-        } else {
-            format!(
-                "WaitForSingleObject(FreeLibrary) returned 0x{:08x}; cleanup ownership transferred to a reaper",
-                wait_result.0
-            )
-        };
-        reap_thread_handle_async(format!("remote FreeLibrary pid={pid}"), h_thread);
-        return Err(detail);
-    }
-
-    let mut exit_code = 0u32;
-    let result = unsafe { GetExitCodeThread(h_thread, &mut exit_code) };
-    unsafe {
-        let _ = CloseHandle(h_thread);
-    }
-    result.map_err(|error| format!("GetExitCodeThread(FreeLibrary) failed: {error:?}"))?;
-    if exit_code == 0 {
-        return Err("remote FreeLibrary returned FALSE".into());
-    }
-    Ok(())
-}
-
 fn do_eject(pid: u32) -> Result<(), String> {
-    let dll_name = speedpatch_dll(BRIDGE_IS64);
-    let local_dll = exe_dir()?.join(dll_name);
-    let local_dll_path = local_dll.to_string_lossy().to_string();
-    let module = find_remote_module(pid, dll_name, Some(&local_dll_path))?
-        .ok_or_else(|| format!("{dll_name} is not loaded in pid={pid}"))?;
-
-    let local_dll_w = to_wide(&local_dll_path);
-    let local_module = unsafe { LoadLibraryW(PCWSTR::from_raw(local_dll_w.as_ptr())) }
-        .map_err(|error| format!("LoadLibraryW(local {dll_name}) failed: {error:?}"))?;
-    let shutdown_rva = unsafe { GetProcAddress(local_module, s!("SP_Shutdown")) }
-        .ok_or_else(|| "GetProcAddress(SP_Shutdown) failed".to_string())
-        .and_then(|proc| {
-            (proc as usize)
-                .checked_sub(local_module.0 as usize)
-                .ok_or_else(|| "SP_Shutdown address is below local module base".to_string())
-        });
-    unsafe {
-        let _ = FreeLibrary(local_module);
-    }
-    let remote_shutdown = module.base + shutdown_rva?;
-
-    let h_proc = unsafe {
-        OpenProcess(
-            PROCESS_CREATE_THREAD
-                | PROCESS_QUERY_INFORMATION
-                | PROCESS_VM_OPERATION
-                | PROCESS_VM_WRITE
-                | PROCESS_VM_READ,
-            false,
-            pid,
-        )
-    }
-    .map_err(|error| format!("OpenProcess(pid={pid}) failed: {error:?}"))?;
-    let h_shutdown = match unsafe {
-        CreateRemoteThread(
-            h_proc,
-            None,
-            0,
-            Some(remote_thread_start(remote_shutdown)),
-            None,
-            0,
-            None,
-        )
-    } {
-        Ok(thread) => thread,
-        Err(error) => {
-            unsafe {
-                let _ = CloseHandle(h_proc);
-            }
-            return Err(format!("CreateRemoteThread(SP_Shutdown) failed: {error:?}"));
-        }
-    };
-
-    let wait_result = unsafe { WaitForSingleObject(h_shutdown, 5_000) };
-    if wait_result != WAIT_OBJECT_0 {
-        let detail = if wait_result == WAIT_TIMEOUT {
-            "SP_Shutdown timed out after 5s; DLL was not unloaded".to_string()
-        } else if wait_result == WAIT_FAILED {
-            let gle = unsafe { GetLastError() };
-            format!("WaitForSingleObject(SP_Shutdown) failed: gle={}", gle.0)
-        } else {
-            format!(
-                "WaitForSingleObject(SP_Shutdown) returned 0x{:08x}",
-                wait_result.0
-            )
-        };
-        unsafe {
-            let _ = CloseHandle(h_shutdown);
-            let _ = CloseHandle(h_proc);
-        }
-        return Err(detail);
-    }
-
-    let mut shutdown_code = 0u32;
-    let exit_result = unsafe { GetExitCodeThread(h_shutdown, &mut shutdown_code) };
-    unsafe {
-        let _ = CloseHandle(h_shutdown);
-    }
-    if let Err(error) = exit_result {
-        unsafe {
-            let _ = CloseHandle(h_proc);
-        }
-        return Err(format!(
-            "GetExitCodeThread(SP_Shutdown) failed: {error:?}; DLL was not unloaded"
-        ));
-    }
-    if shutdown_code != 0 {
-        unsafe {
-            let _ = CloseHandle(h_proc);
-        }
-        if shutdown_code == windows::Win32::Foundation::ERROR_NOT_SUPPORTED.0 {
-            return Err(
-                "live ejection is intentionally disabled because active time-hook call stacks cannot be unloaded safely; acceleration was disabled, and the DLL will unload when the target exits"
-                    .into(),
-            );
-        }
-        return Err(format!(
-            "SP_Shutdown returned win32_error={shutdown_code}; DLL was not unloaded"
-        ));
-    }
-
-    let unload_result = remote_free_library(pid, &h_proc, module.base);
-    unsafe {
-        let _ = CloseHandle(h_proc);
-    }
-    unload_result?;
-
-    if let Some(still_loaded) = find_remote_module(pid, dll_name, Some(&local_dll_path))? {
-        return Err(format!(
-            "FreeLibrary returned success, but {dll_name} remains loaded at 0x{:x}; another loader reference exists",
-            still_loaded.base
-        ));
-    }
+    let _operation = RemoteOperationLease::try_acquire()?;
+    do_disable_inner(pid)?;
+    dbg_log(&format!(
+        "do_eject pid={pid}: acceleration disabled; DLL remains resident until target exit"
+    ));
     untrack_target(pid);
     Ok(())
 }
 
 fn do_enable(pid: u32) -> Result<(), String> {
-    match read_speedpatch_state(pid)? {
+    let _operation = RemoteOperationLease::try_acquire()?;
+    do_enable_inner(pid)
+}
+
+fn do_enable_inner(pid: u32) -> Result<(), String> {
+    let handshake = read_speedpatch_handshake(pid)?;
+    match handshake.map(|value| value.state) {
         Some(SpeedpatchState::Enabled) => {
             track_target(pid);
             return Ok(());
@@ -1530,8 +2050,9 @@ fn do_enable(pid: u32) -> Result<(), String> {
             ));
         }
         Some(SpeedpatchState::Failed) => {
-            return Err(format!(
-                "SP_Initialize failed for pid={pid}; restart the target before retrying"
+            return Err(persisted_initialization_failure(
+                pid,
+                handshake.expect("failed state without handshake"),
             ));
         }
         Some(SpeedpatchState::Disabled) | None => {}
@@ -1560,6 +2081,11 @@ fn do_enable(pid: u32) -> Result<(), String> {
 }
 
 fn do_disable(pid: u32) -> Result<(), String> {
+    let _operation = RemoteOperationLease::try_acquire()?;
+    do_disable_inner(pid)
+}
+
+fn do_disable_inner(pid: u32) -> Result<(), String> {
     match do_status(pid)? {
         InjectionStatus::NotInjected => {
             untrack_target(pid);
@@ -1590,14 +2116,16 @@ fn do_disable(pid: u32) -> Result<(), String> {
 }
 
 fn do_is_enabled(pid: u32) -> Result<bool, String> {
-    match read_speedpatch_state(pid)? {
+    let handshake = read_speedpatch_handshake(pid)?;
+    match handshake.map(|value| value.state) {
         Some(SpeedpatchState::Enabled) => Ok(true),
         Some(SpeedpatchState::Disabled) => Ok(false),
         Some(SpeedpatchState::Initializing) => {
             Err(format!("SP_Initialize is still running for pid={pid}"))
         }
-        Some(SpeedpatchState::Failed) => Err(format!(
-            "SP_Initialize failed for pid={pid}; restart the target before retrying"
+        Some(SpeedpatchState::Failed) => Err(persisted_initialization_failure(
+            pid,
+            handshake.expect("failed state without handshake"),
         )),
         None => Err(format!("no DzsSpeedy.{pid} mapping")),
     }
@@ -1605,7 +2133,8 @@ fn do_is_enabled(pid: u32) -> Result<bool, String> {
 
 /// Check the exact state of the one supported injection chain.
 fn do_status(pid: u32) -> Result<InjectionStatus, String> {
-    match read_speedpatch_state(pid)? {
+    let handshake = read_speedpatch_handshake(pid)?;
+    match handshake.map(|value| value.state) {
         Some(SpeedpatchState::Enabled) => {
             clear_injection_stage(pid);
             clear_injection_failure(pid);
@@ -1625,13 +2154,10 @@ fn do_status(pid: u32) -> Result<InjectionStatus, String> {
         Some(SpeedpatchState::Failed) => {
             clear_injection_stage(pid);
             untrack_target(pid);
-            return Ok(InjectionStatus::Failed(
-                injection_failure(pid).unwrap_or_else(|| {
-                    format!(
-                        "SP_Initialize failed for pid={pid}; restart the target before retrying"
-                    )
-                }),
-            ));
+            return Ok(InjectionStatus::Failed(persisted_initialization_failure(
+                pid,
+                handshake.expect("failed state without handshake"),
+            )));
         }
         None => {}
     }
@@ -1818,25 +2344,15 @@ const SHUTDOWN_EVENT: &str = "Global\\DzsSpeedyBridge64Shutdown";
 const SHUTDOWN_EVENT: &str = "Global\\DzsSpeedyBridge32Shutdown";
 
 fn shutdown_bridge() -> ! {
-    SHUTDOWN_REQUESTED.store(true, Ordering::Release);
+    request_shutdown();
     disable_tracked_targets();
 
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-    while ACTIVE_REMOTE_OPERATIONS.load(Ordering::Acquire) != 0
-        && std::time::Instant::now() < deadline
-    {
+    while active_remote_operations() != 0 {
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
 
-    let remaining = ACTIVE_REMOTE_OPERATIONS.load(Ordering::Acquire);
-    if remaining != 0 {
-        dbg_log(&format!(
-            "shutdown grace period expired with {remaining} remote operation(s) still active"
-        ));
-    }
-
     // An injection may have completed after the first snapshot. Its success
-    // path also observes SHUTDOWN_REQUESTED, and this second pass closes the race.
+    // path also observes the shutdown bit, and this second pass closes the race.
     disable_tracked_targets();
     dbg_log("bridge shutdown complete");
     std::process::exit(0);
@@ -2084,30 +2600,213 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_initialize_exit_code, normalize_module_path};
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    use super::{
+        classify_handshake, decode_initialize_exit_code, normalize_module_path,
+        ordered_hook_threads, persisted_initialization_failure, try_acquire_operation_slot,
+        HandshakeProgress, HookThreadCandidate, SpeedpatchHandshake, SpeedpatchState,
+        TargetProcessHandle, OPERATION_SHUTDOWN_BIT,
+    };
 
     #[test]
-    fn decodes_precise_hook_creation_failure_as_safe_to_unload() {
+    fn orders_visible_hidden_and_process_threads_for_the_single_hook_path() {
+        let candidates = [
+            HookThreadCandidate {
+                thread_id: 41,
+                visible: false,
+            },
+            HookThreadCandidate {
+                thread_id: 42,
+                visible: true,
+            },
+            HookThreadCandidate {
+                thread_id: 43,
+                visible: true,
+            },
+        ];
+
+        assert_eq!(
+            ordered_hook_threads(&candidates, &[44, 41, 45]),
+            vec![42, 43, 41, 44, 45]
+        );
+    }
+
+    #[test]
+    fn falls_back_to_process_threads_when_no_window_thread_exists() {
+        assert_eq!(ordered_hook_threads(&[], &[0, 44, 44, 45]), vec![44, 45]);
+    }
+
+    #[test]
+    fn rejects_zero_thread_ids() {
+        let candidates = [HookThreadCandidate {
+            thread_id: 0,
+            visible: true,
+        }];
+
+        assert!(ordered_hook_threads(&candidates, &[0]).is_empty());
+    }
+
+    #[test]
+    fn does_not_accept_a_terminal_state_before_callback_metadata() {
+        for handshake in [
+            SpeedpatchHandshake {
+                state: SpeedpatchState::Enabled,
+                init_result: windows::Win32::Foundation::ERROR_IO_PENDING.0,
+                hook_thread_id: 71,
+                callback_completed: false,
+            },
+            SpeedpatchHandshake {
+                state: SpeedpatchState::Enabled,
+                init_result: 0,
+                hook_thread_id: 0,
+                callback_completed: false,
+            },
+        ] {
+            assert_eq!(classify_handshake(handshake), HandshakeProgress::Pending);
+        }
+    }
+
+    #[test]
+    fn does_not_accept_terminal_handshake_before_callback_completion_marker() {
+        assert_eq!(
+            classify_handshake(SpeedpatchHandshake {
+                state: SpeedpatchState::Enabled,
+                init_result: 0,
+                hook_thread_id: 76,
+                callback_completed: false,
+            }),
+            HandshakeProgress::Pending
+        );
+    }
+
+    #[test]
+    fn accepts_success_that_shutdown_kept_disabled() {
+        assert_eq!(
+            classify_handshake(SpeedpatchHandshake {
+                state: SpeedpatchState::Disabled,
+                init_result: 0,
+                hook_thread_id: 72,
+                callback_completed: true,
+            }),
+            HandshakeProgress::Complete {
+                callback_thread: 72,
+                state: SpeedpatchState::Disabled,
+            }
+        );
+    }
+
+    #[test]
+    fn preserves_failed_callback_result() {
+        assert_eq!(
+            classify_handshake(SpeedpatchHandshake {
+                state: SpeedpatchState::Failed,
+                init_result: 0x0209_0008,
+                hook_thread_id: 73,
+                callback_completed: true,
+            }),
+            HandshakeProgress::Failed {
+                callback_thread: 73,
+                init_result: 0x0209_0008,
+            }
+        );
+    }
+
+    #[test]
+    fn waits_for_failed_state_after_failure_result_is_published() {
+        assert_eq!(
+            classify_handshake(SpeedpatchHandshake {
+                state: SpeedpatchState::Disabled,
+                init_result: 0x0209_0008,
+                hook_thread_id: 74,
+                callback_completed: false,
+            }),
+            HandshakeProgress::Pending
+        );
+    }
+
+    #[test]
+    fn decodes_persisted_failure_after_bridge_restart() {
+        let detail = persisted_initialization_failure(
+            4_242_424,
+            SpeedpatchHandshake {
+                state: SpeedpatchState::Failed,
+                init_result: 0x0209_0008,
+                hook_thread_id: 75,
+                callback_completed: true,
+            },
+        );
+
+        assert!(detail.contains("callback_thread=75"));
+        assert!(detail.contains("GetTickCount"));
+        assert!(detail.contains("MH_ERROR_UNSUPPORTED_FUNCTION"));
+    }
+
+    #[test]
+    fn shutdown_bit_atomically_closes_operation_admission() {
+        let state = AtomicU32::new(0);
+        try_acquire_operation_slot(&state).expect("acquire before shutdown");
+        state.fetch_or(OPERATION_SHUTDOWN_BIT, Ordering::AcqRel);
+
+        assert!(try_acquire_operation_slot(&state).is_err());
+        assert_eq!(state.load(Ordering::Acquire), OPERATION_SHUTDOWN_BIT | 1);
+    }
+
+    #[test]
+    fn detects_target_process_exit_without_waiting_for_hook_timeout() {
+        let mut child = std::process::Command::new("cmd.exe")
+            .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+            .spawn()
+            .expect("spawn target-exit fixture");
+        let process = TargetProcessHandle::open(child.id()).expect("open target process handle");
+        assert!(!process.has_exited().expect("query live target"));
+
+        child.kill().expect("terminate target-exit fixture");
+        child.wait().expect("wait for target-exit fixture");
+        assert!(process.has_exited().expect("query exited target"));
+    }
+
+    #[test]
+    fn decodes_precise_hook_creation_failure() {
         let code = 0x0200_0000 | (9 << 16) | 8;
         let error = match decode_initialize_exit_code(code) {
             Err(error) => error,
             Ok(()) => panic!("hook failure was accepted"),
         };
 
-        assert!(error.safe_to_unload);
         assert!(error.detail.contains("GetTickCount"));
         assert!(error.detail.contains("MH_ERROR_UNSUPPORTED_FUNCTION"));
     }
 
     #[test]
-    fn treats_enable_and_restart_required_failures_as_unsafe_to_unload() {
-        for code in [0x0300_0000 | 10, 0x0700_0000] {
-            let error = match decode_initialize_exit_code(code) {
-                Err(error) => error,
-                Ok(()) => panic!("unsafe initialization failure was accepted"),
-            };
-            assert!(!error.safe_to_unload);
-        }
+    fn decodes_enable_and_restart_required_failures() {
+        let enable_error = decode_initialize_exit_code(0x0300_0000 | 10).unwrap_err();
+        assert!(enable_error.detail.contains("MH_EnableHook"));
+
+        let restart_error = decode_initialize_exit_code(0x0700_0000).unwrap_err();
+        assert!(restart_error.detail.contains("restart the target"));
+    }
+
+    #[test]
+    fn decodes_hook_self_reference_failure() {
+        let error = match decode_initialize_exit_code(0x0800_0000 | 5) {
+            Err(error) => error,
+            Ok(()) => panic!("self-reference failure was accepted"),
+        };
+
+        assert!(error.detail.contains("self-reference"));
+        assert!(error.detail.contains("win32_error=5"));
+    }
+
+    #[test]
+    fn decodes_hook_completion_event_failure() {
+        let error = match decode_initialize_exit_code(0x0900_0000 | 5) {
+            Err(error) => error,
+            Ok(()) => panic!("completion event failure was accepted"),
+        };
+
+        assert!(error.detail.contains("completion event"));
+        assert!(error.detail.contains("win32_error=5"));
     }
 
     #[test]

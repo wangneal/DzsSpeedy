@@ -58,9 +58,9 @@ fn shutdown_bridges() {
             std::thread::sleep(Duration::from_millis(25));
         }
 
-        // Do not force-kill a bridge that is draining a remote LoadLibraryW or
-        // SP_Initialize thread. The bridge has its own bounded shutdown grace
-        // period and will disable a target again when a pending injection ends.
+        // Do not force-kill a bridge while a Windows hook callback is
+        // initializing speedpatch. The bridge has its own bounded shutdown
+        // grace period and disables the target when initialization ends.
         children.clear();
     }
 }

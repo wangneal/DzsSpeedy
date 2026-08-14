@@ -4,19 +4,35 @@
 //! - Cross arch: cmake -A to target the other platform
 
 use std::env;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::process::Command;
+
+/// Avoid replacing a DLL that a running target already maps when the build
+/// produced the same bytes. A changed mapped DLL must still fail explicitly.
+fn copy_if_changed(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
+    if dst.exists() && fs::read(src)? == fs::read(dst)? {
+        return Ok(());
+    }
+
+    fs::copy(src, dst).map(|_| ())
+}
 
 /// Build a cmake project (host arch) via the cmake crate, copy the output binary.
 fn build_cmake_crate(
     manifest_dir: &PathBuf,
     profile: &str,
-    project_dir: &str,    // relative to manifest_dir, e.g. "../speedpatch"
-    bin_prefix: &str,     // e.g. "speedpatch" or "bridge"
-    bin_suffix: &str,     // "32" or "64"
-    file_ext: &str,       // "dll" or "exe"
+    project_dir: &str, // relative to manifest_dir, e.g. "../speedpatch"
+    bin_prefix: &str,  // e.g. "speedpatch" or "bridge"
+    bin_suffix: &str,  // "32" or "64"
+    file_ext: &str,    // "dll" or "exe"
 ) {
-    let build_type = if profile == "release" { "Release" } else { "Debug" };
+    let build_type = if profile == "release" {
+        "Release"
+    } else {
+        "Debug"
+    };
     let bin_name = format!("{}{}.{}", bin_prefix, bin_suffix, file_ext);
 
     println!("cargo:info=[cmake crate] building {bin_name} (host arch)...");
@@ -29,8 +45,13 @@ fn build_cmake_crate(
     let prof_dir = manifest_dir.join("target").join(profile);
     let bin_dst = prof_dir.join(&bin_name);
 
-    std::fs::copy(&bin_src, &bin_dst).unwrap_or_else(|e| {
-        panic!("copy {} -> {} failed: {}", bin_src.display(), bin_dst.display(), e);
+    copy_if_changed(&bin_src, &bin_dst).unwrap_or_else(|e| {
+        panic!(
+            "copy {} -> {} failed: {}",
+            bin_src.display(),
+            bin_dst.display(),
+            e
+        );
     });
     println!("cargo:info=  -> {}", bin_dst.display());
 }
@@ -42,16 +63,23 @@ fn build_cmake_crate(
 fn build_cmake_cross(
     manifest_dir: &PathBuf,
     profile: &str,
-    project_dir: &str,       // relative to manifest_dir, e.g. "../speedpatch"
-    cmake_arch: &str,         // "Win32" or "x64"
-    bin_prefix: &str,         // e.g. "speedpatch" or "bridge"
-    bin_suffix: &str,         // "32" or "64"
-    file_ext: &str,           // "dll" or "exe"
-    build_subdir: &str,       // subdirectory under target/ for build artifacts
+    project_dir: &str,  // relative to manifest_dir, e.g. "../speedpatch"
+    cmake_arch: &str,   // "Win32" or "x64"
+    bin_prefix: &str,   // e.g. "speedpatch" or "bridge"
+    bin_suffix: &str,   // "32" or "64"
+    file_ext: &str,     // "dll" or "exe"
+    build_subdir: &str, // subdirectory under target/ for build artifacts
 ) {
-    let build_type = if profile == "release" { "Release" } else { "Debug" };
+    let build_type = if profile == "release" {
+        "Release"
+    } else {
+        "Debug"
+    };
     let bin_name = format!("{}{}.{}", bin_prefix, bin_suffix, file_ext);
-    let build_root = manifest_dir.join("target").join(build_subdir).join(cmake_arch);
+    let build_root = manifest_dir
+        .join("target")
+        .join(build_subdir)
+        .join(cmake_arch);
 
     println!("cargo:info=[cmake crate] building {bin_name} (-A {cmake_arch})...");
 
@@ -71,8 +99,13 @@ fn build_cmake_cross(
     let prof_dir = manifest_dir.join("target").join(profile);
     let bin_dst = prof_dir.join(&bin_name);
 
-    std::fs::copy(&bin_src, &bin_dst).unwrap_or_else(|e| {
-        panic!("copy {} -> {} failed: {}", bin_src.display(), bin_dst.display(), e);
+    copy_if_changed(&bin_src, &bin_dst).unwrap_or_else(|e| {
+        panic!(
+            "copy {} -> {} failed: {}",
+            bin_src.display(),
+            bin_dst.display(),
+            e
+        );
     });
     println!("cargo:info=  -> {}", bin_dst.display());
 }
@@ -89,12 +122,44 @@ fn build_project(
 ) {
     match target_arch {
         "x86_64" => {
-            build_cmake_crate(manifest_dir, profile, project_dir, bin_prefix, "64", file_ext);
-            build_cmake_cross(manifest_dir, profile, project_dir, "Win32", bin_prefix, "32", file_ext, build_subdir);
+            build_cmake_crate(
+                manifest_dir,
+                profile,
+                project_dir,
+                bin_prefix,
+                "64",
+                file_ext,
+            );
+            build_cmake_cross(
+                manifest_dir,
+                profile,
+                project_dir,
+                "Win32",
+                bin_prefix,
+                "32",
+                file_ext,
+                build_subdir,
+            );
         }
         "x86" => {
-            build_cmake_crate(manifest_dir, profile, project_dir, bin_prefix, "32", file_ext);
-            build_cmake_cross(manifest_dir, profile, project_dir, "x64", bin_prefix, "64", file_ext, build_subdir);
+            build_cmake_crate(
+                manifest_dir,
+                profile,
+                project_dir,
+                bin_prefix,
+                "32",
+                file_ext,
+            );
+            build_cmake_cross(
+                manifest_dir,
+                profile,
+                project_dir,
+                "x64",
+                bin_prefix,
+                "64",
+                file_ext,
+                build_subdir,
+            );
         }
         _ => unreachable!(),
     }
@@ -102,14 +167,34 @@ fn build_project(
 
 /// Build the Rust bridge crate via cargo for one target triple.
 /// Returns `(target_arch_name, built_exe_path)` on success.
-fn cargo_build_bridge(bridge_dir: &PathBuf, profile: &str, target: Option<&str>) -> Option<(String, PathBuf)> {
-    let profile_flag = if profile == "release" { "--release" } else { "" };
-    let build_type = if profile == "release" { "release" } else { "debug" };
+fn cargo_build_bridge(
+    bridge_dir: &PathBuf,
+    profile: &str,
+    target: Option<&str>,
+) -> Option<(String, PathBuf)> {
+    let profile_flag = if profile == "release" {
+        "--release"
+    } else {
+        ""
+    };
+    let build_type = if profile == "release" {
+        "release"
+    } else {
+        "debug"
+    };
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["build", "--manifest-path", &bridge_dir.join("Cargo.toml").to_string_lossy()]);
-    if !profile_flag.is_empty() { cmd.arg(profile_flag); }
-    if let Some(t) = target { cmd.args(["--target", t]); }
+    cmd.args([
+        "build",
+        "--manifest-path",
+        &bridge_dir.join("Cargo.toml").to_string_lossy(),
+    ]);
+    if !profile_flag.is_empty() {
+        cmd.arg(profile_flag);
+    }
+    if let Some(t) = target {
+        cmd.args(["--target", t]);
+    }
 
     let label = target.unwrap_or("host");
     println!("cargo:info=[cargo] building bridge ({label})...");
@@ -125,7 +210,9 @@ fn cargo_build_bridge(bridge_dir: &PathBuf, profile: &str, target: Option<&str>)
         bridge_dir.join("target").join(build_type)
     };
     let src = target_dir.join("bridge.exe");
-    if !src.exists() { return None; }
+    if !src.exists() {
+        return None;
+    }
     Some((label.to_string(), src))
 }
 
@@ -137,20 +224,28 @@ fn build_rust_bridge(manifest_dir: &PathBuf, profile: &str) {
     // --- 64-bit (host arch) ---
     if let Some((_, src)) = cargo_build_bridge(&bridge_dir, profile, None) {
         let dst = prof_dir.join("bridge64.exe");
-        std::fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {} -> {} failed: {}", src.display(), dst.display(), e));
+        std::fs::copy(&src, &dst).unwrap_or_else(|e| {
+            panic!("copy {} -> {} failed: {}", src.display(), dst.display(), e)
+        });
         println!("cargo:info=  -> {}", dst.display());
     }
 
     // --- 32-bit (cross-compile if i686 target installed) ---
-    let check = Command::new("rustup").args(["target", "list", "--installed"]).output();
-    let has_i686 = check.map(|o| {
-        String::from_utf8_lossy(&o.stdout).contains("i686-pc-windows-msvc")
-    }).unwrap_or(false);
+    let check = Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output();
+    let has_i686 = check
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("i686-pc-windows-msvc"))
+        .unwrap_or(false);
 
     if has_i686 {
-        if let Some((_, src)) = cargo_build_bridge(&bridge_dir, profile, Some("i686-pc-windows-msvc")) {
+        if let Some((_, src)) =
+            cargo_build_bridge(&bridge_dir, profile, Some("i686-pc-windows-msvc"))
+        {
             let dst = prof_dir.join("bridge32.exe");
-            std::fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {} -> {} failed: {}", src.display(), dst.display(), e));
+            std::fs::copy(&src, &dst).unwrap_or_else(|e| {
+                panic!("copy {} -> {} failed: {}", src.display(), dst.display(), e)
+            });
             println!("cargo:info=  -> {}", dst.display());
         } else {
             panic!("bridge32.exe build failed (i686-pc-windows-msvc). WOW64 games need bridge32.");
@@ -179,8 +274,15 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
     // --- speedpatch DLLs (C++ / cmake) ---
-    build_project(&manifest_dir, &profile, target_arch.as_str(),
-        "../src-bridge/speedpatch", "speedpatch", "dll", "speedpatch-build");
+    build_project(
+        &manifest_dir,
+        &profile,
+        target_arch.as_str(),
+        "../src-bridge/speedpatch",
+        "speedpatch",
+        "dll",
+        "speedpatch-build",
+    );
 
     // --- bridge EXEs (Rust / cargo) ---
     build_rust_bridge(&manifest_dir, &profile);
@@ -197,7 +299,12 @@ fn main() {
     let bin_dir = manifest_dir.join("binaries");
     let _ = std::fs::create_dir_all(&bin_dir);
     let prof_dir = manifest_dir.join("target").join(profile);
-    for name in &["speedpatch32.dll", "speedpatch64.dll", "bridge32.exe", "bridge64.exe"] {
+    for name in &[
+        "speedpatch32.dll",
+        "speedpatch64.dll",
+        "bridge32.exe",
+        "bridge64.exe",
+    ] {
         let src = prof_dir.join(name);
         if src.exists() {
             let dst = bin_dir.join(name);
@@ -206,8 +313,8 @@ fn main() {
         }
     }
 
-    let windows = tauri_build::WindowsAttributes::new()
-        .app_manifest(include_str!("windows/app.manifest"));
+    let windows =
+        tauri_build::WindowsAttributes::new().app_manifest(include_str!("windows/app.manifest"));
     let attributes = tauri_build::Attributes::new().windows_attributes(windows);
     tauri_build::try_build(attributes).expect("failed to run Tauri build script");
 }

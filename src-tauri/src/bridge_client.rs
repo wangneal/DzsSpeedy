@@ -3,8 +3,8 @@
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::Mutex;
-use windows::core::PCWSTR;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
+use windows::core::{HRESULT, PCWSTR};
+use windows::Win32::Foundation::{CloseHandle, ERROR_MORE_DATA, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
@@ -122,22 +122,44 @@ fn pipe_command(pipe: &str, cmd: &str) -> Result<String, String> {
         return Err(error);
     }
 
-    let mut buf = [0u8; 4096];
-    let mut nread = 0u32;
-    let read_result = unsafe { ReadFile(h, Some(&mut buf), Some(&mut nread), None) };
+    let mut response = Vec::new();
+    let read_result = loop {
+        let mut buf = [0u8; 4096];
+        let mut nread = 0u32;
+        match unsafe { ReadFile(h, Some(&mut buf), Some(&mut nread), None) } {
+            Ok(()) => {
+                response.extend_from_slice(&buf[..nread as usize]);
+                break Ok(());
+            }
+            Err(error) if error.code() == HRESULT::from_win32(ERROR_MORE_DATA.0) => {
+                if nread == 0 {
+                    break Err("pipe returned ERROR_MORE_DATA without any data".to_string());
+                }
+                response.extend_from_slice(&buf[..nread as usize]);
+                if response.len() > 1024 * 1024 {
+                    break Err("pipe response exceeded the 1 MiB diagnostic limit".to_string());
+                }
+            }
+            Err(error) => {
+                let partial = String::from_utf8_lossy(&response);
+                break Err(format!(
+                    "pipe read failed for {cmd} (err={error:?}, nread={nread}, partial_response={partial:?})"
+                ));
+            }
+        }
+    };
     unsafe {
         let _ = CloseHandle(h);
     }
 
-    if let Err(error) = read_result {
-        let detail = format!("pipe read failed for {cmd} (err={error:?}, nread={nread})");
+    if let Err(detail) = read_result {
         let error = outcome_unknown(cmd, &detail);
         let line = format!("[bridge] {cmd} -> {error}");
         eprintln!("{line}");
         frontend_log(&line);
         return Err(error);
     }
-    if nread == 0 {
+    if response.is_empty() {
         let detail = format!("pipe read returned no data for {cmd}");
         let error = outcome_unknown(cmd, &detail);
         let line = format!("[bridge] {cmd} -> {error}");
@@ -146,9 +168,7 @@ fn pipe_command(pipe: &str, cmd: &str) -> Result<String, String> {
         return Err(error);
     }
 
-    let resp = String::from_utf8_lossy(&buf[..nread as usize])
-        .trim()
-        .to_string();
+    let resp = String::from_utf8_lossy(&response).trim().to_string();
     let line = format!("[bridge] {cmd} -> {resp}");
     eprintln!("{line}");
     frontend_log(&line);
@@ -188,7 +208,76 @@ fn expect_ok(pipe: &str, cmd: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{bridge_response_result, outcome_unknown, parse_status_response, BridgeStatus};
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{
+        CloseHandle, GetLastError, ERROR_PIPE_CONNECTED, HANDLE, INVALID_HANDLE_VALUE,
+    };
+    use windows::Win32::Storage::FileSystem::{ReadFile, WriteFile, FILE_FLAGS_AND_ATTRIBUTES};
+    use windows::Win32::System::Pipes::{
+        ConnectNamedPipe, CreateNamedPipeW, NAMED_PIPE_MODE, PIPE_READMODE_MESSAGE,
+        PIPE_TYPE_MESSAGE, PIPE_WAIT,
+    };
+
+    use super::{
+        bridge_response_result, outcome_unknown, parse_status_response, pipe_command, to_wide,
+        BridgeStatus,
+    };
+
+    #[test]
+    fn reads_a_message_larger_than_one_pipe_buffer() {
+        static NEXT_PIPE: AtomicU32 = AtomicU32::new(0);
+        let pipe_name = format!(
+            r"\\.\pipe\DzsSpeedyBridgeTest-{}-{}",
+            std::process::id(),
+            NEXT_PIPE.fetch_add(1, Ordering::Relaxed)
+        );
+        let pipe_name_wide = to_wide(&pipe_name);
+        let server = unsafe {
+            CreateNamedPipeW(
+                PCWSTR::from_raw(pipe_name_wide.as_ptr()),
+                FILE_FLAGS_AND_ATTRIBUTES(3),
+                NAMED_PIPE_MODE(PIPE_TYPE_MESSAGE.0 | PIPE_READMODE_MESSAGE.0 | PIPE_WAIT.0),
+                1,
+                4096,
+                4096,
+                0,
+                None,
+            )
+        };
+        assert_ne!(server, INVALID_HANDLE_VALUE);
+
+        let expected = format!("ERROR {}", "native-hook-error;".repeat(512));
+        let server_response = expected.clone();
+        let server_raw = server.0 as usize;
+        let server_thread = std::thread::spawn(move || unsafe {
+            let server = HANDLE(server_raw as *mut std::ffi::c_void);
+            let connected = ConnectNamedPipe(server, None);
+            assert!(connected.is_ok() || GetLastError() == ERROR_PIPE_CONNECTED);
+
+            let mut request = [0u8; 128];
+            let mut request_len = 0u32;
+            ReadFile(server, Some(&mut request), Some(&mut request_len), None)
+                .expect("read test request");
+            assert!(request_len > 0);
+
+            let mut written = 0u32;
+            WriteFile(
+                server,
+                Some(server_response.as_bytes()),
+                Some(&mut written),
+                None,
+            )
+            .expect("write oversized test response");
+            assert_eq!(written as usize, server_response.len());
+            let _ = CloseHandle(server);
+        });
+
+        let actual = pipe_command(&pipe_name, "STATUS 42").expect("read oversized response");
+        server_thread.join().expect("join named-pipe test server");
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn accepts_ok_response() {

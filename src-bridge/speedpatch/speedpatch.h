@@ -21,6 +21,9 @@
 #include <windows.h>
 #include <string>
 
+// The high bit of the shared hook-thread field means SP_HookProc reached its
+// final write. The lower 31 bits contain the callback thread ID.
+
 #if defined(SPEEDPATCH_LIBRARY)
 #define SPEEDPATCH_API __declspec(dllexport)
 #else
@@ -38,6 +41,7 @@ extern "C"
 SPEEDPATCH_API void SP_Install();
 SPEEDPATCH_API void SP_Uninstall();
 SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID reserved);
+SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam);
 SPEEDPATCH_API BOOL SP_IsEnabled();
 SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId);
 SPEEDPATCH_API void SP_Enable(DWORD processId);

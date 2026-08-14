@@ -24,9 +24,12 @@
 #include "speedpatch.h"
 #include <atomic>
 #include <mmsystem.h>
+#include <sddl.h>
 #include <shared_mutex>
 #include <sstream>
+#include <vector>
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "advapi32.lib")
 #pragma data_seg("shared")
 static volatile double factor = 1.0;
 #pragma data_seg()
@@ -35,14 +38,19 @@ static volatile double factor = 1.0;
 static std::shared_mutex mutex;
 static std::atomic<double> pre_factor = 1.0;
 static std::atomic<LONG> initState = 0;
+static std::atomic<LONG> hookCallbackState = 0;
 static HANDLE hFileMap;
 static LONG* pState;
+static LONG* pInitResult;
+static LONG* pHookThreadId;
+static HMODULE selfReference;
 static DWORD installErrorCode;
 
 static constexpr LONG SP_STATE_INITIALIZING = 0x49;
 static constexpr LONG SP_STATE_DISABLED = 0x44;
 static constexpr LONG SP_STATE_ENABLED = 0x45;
 static constexpr LONG SP_STATE_FAILED = 0x46;
+static constexpr LONG SP_HOOK_COMPLETED = static_cast<LONG>(0x80000000);
 
 static LONG SP_ReadState(volatile LONG* state)
 {
@@ -52,6 +60,14 @@ static LONG SP_ReadState(volatile LONG* state)
 static void SP_WriteState(volatile LONG* state, LONG value)
 {
     InterlockedExchange(state, value);
+}
+
+static void SP_MarkHookCompleted()
+{
+    if (pHookThreadId != nullptr)
+    {
+        InterlockedOr(pHookThreadId, SP_HOOK_COMPLETED);
+    }
 }
 
 static bool SP_CompareAndSetState(volatile LONG* state, LONG expected, LONG value)
@@ -66,6 +82,8 @@ static constexpr DWORD SP_INIT_MAPPING_CREATE_ERROR = 0x04000000;
 static constexpr DWORD SP_INIT_MAPPING_VIEW_ERROR = 0x05000000;
 static constexpr DWORD SP_INIT_ROLLBACK_ERROR = 0x06000000;
 static constexpr DWORD SP_INIT_RESTART_REQUIRED = 0x07000000;
+static constexpr DWORD SP_INIT_SELF_REFERENCE_ERROR = 0x08000000;
+static constexpr DWORD SP_INIT_COMPLETION_EVENT_ERROR = 0x09000000;
 
 static DWORD SP_EncodeMhError(DWORD kind, MH_STATUS status, DWORD hookId = 0)
 {
@@ -216,6 +234,114 @@ SPEEDPATCH_API double SP_GetSpeed()
     return factor;
 }
 
+static HANDLE SP_OpenHookCompletionEvent()
+{
+    wchar_t eventName[96];
+    _snwprintf_s(eventName, _countof(eventName), _TRUNCATE,
+                 L"DzsSpeedyHookComplete.%lu", GetCurrentProcessId());
+    return OpenEventW(EVENT_MODIFY_STATE, FALSE, eventName);
+}
+
+SPEEDPATCH_API LRESULT CALLBACK SP_HookProc(int code, WPARAM wParam, LPARAM lParam)
+{
+    bool callbackEntered = false;
+    HANDLE completionEvent = nullptr;
+    if (code >= 0)
+    {
+        LONG expected = 0;
+        if (hookCallbackState.compare_exchange_strong(expected, 1))
+        {
+            callbackEntered = true;
+            DWORD result = ERROR_SUCCESS;
+            if (pState == nullptr)
+            {
+                SP_Install();
+            }
+            if (pHookThreadId != nullptr)
+            {
+                SP_WriteState(pHookThreadId, static_cast<LONG>(GetCurrentThreadId()));
+            }
+            completionEvent = SP_OpenHookCompletionEvent();
+            if (completionEvent == nullptr)
+            {
+                DWORD error = GetLastError();
+                result = SP_INIT_COMPLETION_EVENT_ERROR | (error & 0x00ffffff);
+                if (pInitResult != nullptr)
+                {
+                    SP_WriteState(pInitResult, static_cast<LONG>(result));
+                }
+                if (pState != nullptr)
+                {
+                    SP_WriteState(pState, SP_STATE_FAILED);
+                }
+                hookCallbackState.store(3);
+                SP_DbgLog(L"SP_HookProc: OpenEventW(completion) FAILED err=%lu", error);
+            }
+            else
+            {
+                HMODULE module = nullptr;
+                if (!GetModuleHandleExW(
+                    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                    reinterpret_cast<LPCWSTR>(&SP_HookProc),
+                    &module))
+            {
+                DWORD error = GetLastError();
+                result = SP_INIT_SELF_REFERENCE_ERROR | (error & 0x00ffffff);
+                SP_DbgLog(L"SP_HookProc: GetModuleHandleExW(self) FAILED err=%lu", error);
+            }
+            else
+            {
+                selfReference = module;
+                if (pHookThreadId != nullptr)
+                {
+                    SP_WriteState(pHookThreadId, static_cast<LONG>(GetCurrentThreadId()));
+                }
+                result = pState != nullptr
+                           ? SP_Initialize(nullptr)
+                           : (installErrorCode != ERROR_SUCCESS
+                                  ? installErrorCode
+                                  : (SP_INIT_MAPPING_CREATE_ERROR | ERROR_GEN_FAILURE));
+            }
+                if (pInitResult != nullptr)
+                {
+                    SP_WriteState(pInitResult, static_cast<LONG>(result));
+                }
+                if (pState != nullptr)
+                {
+                    if (result == ERROR_SUCCESS)
+                    {
+                        SP_CompareAndSetState(pState, SP_STATE_INITIALIZING, SP_STATE_ENABLED);
+                    }
+                    else
+                    {
+                        SP_WriteState(pState, SP_STATE_FAILED);
+                    }
+                }
+                hookCallbackState.store(result == ERROR_SUCCESS ? 2 : 3);
+                SP_DbgLog(L"SP_HookProc: initialization finished result=0x%08lx", result);
+            }
+        }
+    }
+
+    // The bridge may unhook as soon as this marker is visible. Publish it only
+    // after the downstream hook chain has returned, so UnhookWindowsHookEx
+    // cannot race the callback's own work.
+    LRESULT next = CallNextHookEx(nullptr, code, wParam, lParam);
+    if (callbackEntered)
+    {
+        if (completionEvent != nullptr)
+        {
+            if (!SetEvent(completionEvent))
+            {
+                SP_DbgLog(L"SP_HookProc: SetEvent(completion) FAILED err=%lu", GetLastError());
+            }
+            CloseHandle(completionEvent);
+        }
+        SP_MarkHookCompleted();
+    }
+    return next;
+}
+
 void SP_Install()
 {
     installErrorCode = ERROR_SUCCESS;
@@ -223,9 +349,52 @@ void SP_Install()
     std::wstring filemapName = GetProcessFileMapName(processId);
     SP_DbgLog(L"SP_Install: enter, filemap=%s", filemapName.c_str());
 
-    SECURITY_DESCRIPTOR sd;
-    if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION) ||
-        !SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE))
+    HANDLE token = NULL;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+    {
+        DWORD err = GetLastError();
+        installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
+        SP_DbgLog(L"SP_Install: OpenProcessToken FAILED err=%lu (0x%08lx)",
+                  err, err);
+        return;
+    }
+
+    DWORD tokenUserLength = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &tokenUserLength);
+    std::vector<BYTE> tokenUserBuffer(tokenUserLength);
+    if (tokenUserLength == 0 ||
+        !GetTokenInformation(token, TokenUser, tokenUserBuffer.data(), tokenUserLength,
+                             &tokenUserLength))
+    {
+        DWORD err = GetLastError();
+        CloseHandle(token);
+        installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
+        SP_DbgLog(L"SP_Install: GetTokenInformation(TokenUser) FAILED err=%lu (0x%08lx)",
+                  err, err);
+        return;
+    }
+
+    TOKEN_USER* tokenUser = reinterpret_cast<TOKEN_USER*>(tokenUserBuffer.data());
+    LPWSTR sidString = nullptr;
+    if (!ConvertSidToStringSidW(tokenUser->User.Sid, &sidString))
+    {
+        DWORD err = GetLastError();
+        CloseHandle(token);
+        installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
+        SP_DbgLog(L"SP_Install: ConvertSidToStringSidW FAILED err=%lu (0x%08lx)",
+                  err, err);
+        return;
+    }
+
+    std::wstring sddl = L"D:(A;;GRGW;;;";
+    sddl += sidString;
+    sddl += L")S:(ML;;NW;;;LW)";
+    LocalFree(sidString);
+    CloseHandle(token);
+
+    PSECURITY_DESCRIPTOR securityDescriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.c_str(), SECURITY_DESCRIPTOR_REVISION, &securityDescriptor, nullptr))
     {
         DWORD err = GetLastError();
         installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
@@ -233,9 +402,10 @@ void SP_Install()
                   err, err);
         return;
     }
+
     SECURITY_ATTRIBUTES sa;
     sa.nLength = sizeof(sa);
-    sa.lpSecurityDescriptor = &sd;
+    sa.lpSecurityDescriptor = securityDescriptor;
     sa.bInheritHandle = FALSE;
 
     hFileMap = CreateFileMapping(
@@ -243,23 +413,25 @@ void SP_Install()
         &sa,
         PAGE_READWRITE,
         0,
-        sizeof(LONG),
+        sizeof(LONG) * 3,
         filemapName.c_str()
         );
     if (hFileMap == NULL)
     {
         DWORD err = GetLastError();
+        LocalFree(securityDescriptor);
         installErrorCode = SP_INIT_MAPPING_CREATE_ERROR | (err & 0x00ffffff);
         SP_DbgLog(L"SP_Install: CreateFileMapping FAILED err=%lu (0x%08lx) name=%s",
                   err, err, filemapName.c_str());
         return;
     }
+    LocalFree(securityDescriptor);
     pState = static_cast<LONG*>(MapViewOfFile(
         hFileMap,
         FILE_MAP_ALL_ACCESS,
         0,
         0,
-        sizeof(LONG)
+        sizeof(LONG) * 3
         ));
     if (pState == NULL)
     {
@@ -270,8 +442,13 @@ void SP_Install()
         hFileMap = NULL;
         return;
     }
+    pInitResult = pState + 1;
+    pHookThreadId = pState + 2;
+    SP_WriteState(pInitResult, ERROR_IO_PENDING);
+    SP_WriteState(pHookThreadId, 0);
     SP_WriteState(pState, SP_STATE_INITIALIZING);
-    SP_DbgLog(L"SP_Install: OK, hFileMap=%p pState=%p", hFileMap, (void*)pState);
+    SP_DbgLog(L"SP_Install: OK, hFileMap=%p pState=%p pInitResult=%p pHookThreadId=%p",
+              hFileMap, (void*)pState, (void*)pInitResult, (void*)pHookThreadId);
 }
 
 void SP_Uninstall()
@@ -284,17 +461,30 @@ void SP_Uninstall()
         }
         CloseHandle(hFileMap);
         pState = nullptr;
+        pInitResult = nullptr;
+        pHookThreadId = nullptr;
         hFileMap = NULL;
     }
 }
 SPEEDPATCH_API DWORD WINAPI SP_Shutdown(LPVOID)
 {
-    if (pState != nullptr && SP_ReadState(pState) != SP_STATE_FAILED)
+    if (pState != nullptr)
     {
-        SP_WriteState(pState, SP_STATE_DISABLED);
+        while (true)
+        {
+            LONG current = SP_ReadState(pState);
+            if (current == SP_STATE_FAILED || current == SP_STATE_DISABLED)
+            {
+                break;
+            }
+            if (SP_CompareAndSetState(pState, current, SP_STATE_DISABLED))
+            {
+                break;
+            }
+        }
     }
-    SP_DbgLog(L"SP_Shutdown: live unload refused; hooks disabled logically only");
-    return ERROR_NOT_SUPPORTED;
+    SP_DbgLog(L"SP_Shutdown: acceleration disabled; DLL remains resident until process exit");
+    return ERROR_SUCCESS;
 }
 
 BOOL SP_IsEnabled()
@@ -332,7 +522,7 @@ SPEEDPATCH_API BOOL SP_IsEnabledById(DWORD processId)
 void SP_Enable(DWORD processId)
 {
     std::wstring filemapName = GetProcessFileMapName(processId);
-    HANDLE hFileMap_ = OpenFileMapping(FILE_MAP_ALL_ACCESS,
+    HANDLE hFileMap_ = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE,
                                      FALSE,
                                      filemapName.c_str()
                                      );
@@ -341,7 +531,7 @@ void SP_Enable(DWORD processId)
         return;
     }
     LONG* pStatus = static_cast<LONG*>(MapViewOfFile(hFileMap_,
-                                                     FILE_MAP_ALL_ACCESS,
+                                                     FILE_MAP_READ | FILE_MAP_WRITE,
                                                      0,
                                                      0,
                                                      sizeof(LONG)));
@@ -361,7 +551,7 @@ void SP_Enable(DWORD processId)
 void SP_Disable(DWORD processId)
 {
     std::wstring filemapName = GetProcessFileMapName(processId);
-    HANDLE hFileMap_ = OpenFileMapping(FILE_MAP_ALL_ACCESS,
+    HANDLE hFileMap_ = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE,
                                      FALSE,
                                      filemapName.c_str()
                                      );
@@ -370,7 +560,7 @@ void SP_Disable(DWORD processId)
         return;
     }
     LONG* pStatus = static_cast<LONG*>(MapViewOfFile(hFileMap_,
-                                                     FILE_MAP_ALL_ACCESS,
+                                                     FILE_MAP_READ | FILE_MAP_WRITE,
                                                      0,
                                                      0,
                                                      sizeof(LONG)));
@@ -806,22 +996,16 @@ SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
         return ERROR_BUSY;
     }
 
-    SP_DbgLog(L"SP_Initialize: begin");
-    MH_STATUS status = MH_Initialize();
-    SP_DbgLog(L"SP_Initialize: MH_Initialize status=%s", SP_MhStatusName(status));
-    if (status != MH_OK)
-    {
-        initState.store(0);
-        return SP_EncodeMhError(SP_INIT_MINHOOK_ERROR, status);
-    }
-
     // Publish INITIALIZING before any potentially slow hook work. The bridge
     // can distinguish this from DISABLED and can cancel enablement on shutdown.
-    SP_Install();
+    if (pState == nullptr)
+    {
+        SP_Install();
+    }
     if (pState == nullptr)
     {
         MH_STATUS rollback = MH_Uninitialize();
-        if (rollback != MH_OK)
+        if (rollback != MH_OK && rollback != MH_ERROR_NOT_INITIALIZED)
         {
             initState.store(3);
             return SP_EncodeMhError(SP_INIT_ROLLBACK_ERROR, rollback);
@@ -831,6 +1015,15 @@ SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
         return installErrorCode != ERROR_SUCCESS
                    ? installErrorCode
                    : (SP_INIT_MAPPING_CREATE_ERROR | ERROR_GEN_FAILURE);
+    }
+
+    SP_DbgLog(L"SP_Initialize: begin");
+    MH_STATUS status = MH_Initialize();
+    SP_DbgLog(L"SP_Initialize: MH_Initialize status=%s", SP_MhStatusName(status));
+    if (status != MH_OK)
+    {
+        initState.store(0);
+        return SP_EncodeMhError(SP_INIT_MINHOOK_ERROR, status);
     }
 
     FILETIME now = { 0 };
@@ -913,7 +1106,6 @@ SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
 
     if (hookError != ERROR_SUCCESS)
     {
-        SP_Uninstall();
         MH_STATUS rollback = MH_Uninitialize();
         if (rollback != MH_OK)
         {
@@ -931,7 +1123,6 @@ SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
         // Some hooks may have become active before MinHook reported the
         // failure. Keep the DLL and status mapping resident, and make the
         // failure non-retryable until the target process is restarted.
-        SP_WriteState(pState, SP_STATE_FAILED);
         initState.store(3);
         SP_DbgLog(L"SP_Initialize: MH_EnableHook(MH_ALL_HOOKS) FAILED status=%s rollback=%s",
                   SP_MhStatusName(status), SP_MhStatusName(disableStatus));
@@ -944,7 +1135,6 @@ SPEEDPATCH_API DWORD WINAPI SP_Initialize(LPVOID)
         return SP_EncodeMhError(SP_INIT_HOOK_ENABLE_ERROR, status);
     }
 
-    SP_CompareAndSetState(pState, SP_STATE_INITIALIZING, SP_STATE_ENABLED);
     initState.store(2);
     SP_DbgLog(L"SP_Initialize: all hooks installed");
     return ERROR_SUCCESS;
