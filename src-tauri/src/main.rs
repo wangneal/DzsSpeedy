@@ -61,6 +61,10 @@ fn main() {
                 let _ = CloseHandle(h);
                 return;
             }
+            // HANDLE is Copy without Drop, so binding it to `_` leaks the
+            // kernel handle for the app lifetime and keeps the named mutex
+            // owned (second instances exit above). Do not close it.
+            let _ = h;
         }
     }
 

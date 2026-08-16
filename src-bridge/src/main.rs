@@ -2619,6 +2619,12 @@ fn acquire_bridge_singleton() -> bool {
             return false;
         }
 
+        // HANDLE is a Copy wrapper around a raw kernel handle with no Drop
+        // impl, so binding it to `_` intentionally leaks the handle for the
+        // lifetime of this process: the named mutex stays owned and a second
+        // bridge of the same arch cannot acquire the singleton (verified by
+        // the "second bridge defers" harness check). The kernel reclaims the
+        // handle on process exit.
         let _ = h;
 
         true
