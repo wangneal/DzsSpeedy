@@ -1536,6 +1536,7 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
         let mut terminal_without_completion = false;
         let mut last_cleanup_error = None;
         let mut shutdown_grace_started: Option<std::time::Instant> = None;
+        let mut last_shutdown_disable_log: Option<std::time::Instant> = None;
         loop {
             match process.has_exited() {
                 Ok(true) => {
@@ -1719,9 +1720,20 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
                     shutdown_grace_started = Some(std::time::Instant::now());
                 }
                 if let Err(error) = write_speedpatch_enabled(pid, false) {
-                    dbg_log(&format!(
-                        "pending hook monitor: shutdown disable pending for pid={pid}: {error}"
-                    ));
+                    // Throttle: this failure repeats every ~50 ms while the
+                    // target mapping is absent (DLL never initialized). One
+                    // line per second keeps the log readable without losing
+                    // the diagnostic signal.
+                    let now = std::time::Instant::now();
+                    let should_log = last_shutdown_disable_log
+                        .map(|last| now.duration_since(last) >= std::time::Duration::from_secs(1))
+                        .unwrap_or(true);
+                    if should_log {
+                        last_shutdown_disable_log = Some(now);
+                        dbg_log(&format!(
+                            "pending hook monitor: shutdown disable pending for pid={pid}: {error}"
+                        ));
+                    }
                 }
                 if shutdown_grace_started
                     .expect("shutdown grace timestamp set above")
