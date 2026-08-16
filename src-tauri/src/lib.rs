@@ -4,37 +4,132 @@ mod system_stats;
 
 use process_enumerator::ModuleInfo;
 use process_enumerator::ProcessInfo;
-use std::process::Child;
+use std::process::{Child, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-static BRIDGE_CHILDREN: Mutex<Vec<Child>> = Mutex::new(Vec::new());
+/// (bridge exe name, child handle) — the name lets the repair path respawn
+/// exactly the arch whose bridge died instead of assuming "any child alive
+/// means all bridges are alive".
+static BRIDGE_CHILDREN: Mutex<Vec<(String, Child)>> = Mutex::new(Vec::new());
 
-fn ensure_bridges() {
-    let mut children = BRIDGE_CHILDREN.lock().unwrap();
-    if !children.is_empty() {
-        return;
+const BRIDGE_NAMES: [&str; 2] = ["bridge64.exe", "bridge32.exe"];
+
+fn bridge_name_for_arch(arch: &str) -> &'static str {
+    if arch == "x86" {
+        "bridge32.exe"
+    } else {
+        "bridge64.exe"
     }
+}
 
+fn child_is_live(child: &mut Child) -> bool {
+    child.try_wait().ok().flatten().is_none()
+}
+
+fn prune_exited_children(children: &mut Vec<(String, Child)>) {
+    let mut i = 0;
+    while i < children.len() {
+        if !child_is_live(&mut children[i].1) {
+            children.swap_remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn live_child_for(children: &mut [(String, Child)], name: &str) -> bool {
+    children
+        .iter_mut()
+        .any(|(child_name, child)| child_name == name && child_is_live(child))
+}
+
+fn spawn_bridge(name: &str, children: &mut Vec<(String, Child)>) {
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .unwrap_or_default();
-
-    for name in &["bridge64.exe", "bridge32.exe"] {
-        let path = exe_dir.join(name);
-        if path.exists() {
-            match std::process::Command::new(&path)
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-            {
-                Ok(child) => children.push(child),
-                Err(_) => {}
-            }
+    let path = exe_dir.join(name);
+    if path.exists() {
+        match std::process::Command::new(&path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(child) => children.push((name.to_string(), child)),
+            Err(_) => {}
         }
     }
+}
+
+fn ensure_bridges() {
+    let mut children = BRIDGE_CHILDREN.lock().unwrap();
+    prune_exited_children(&mut children);
+    for name in BRIDGE_NAMES {
+        if !live_child_for(&mut children, name) {
+            spawn_bridge(name, &mut children);
+        }
+    }
+}
+
+/// Repair one bridge arch after a shutdown/pipe failure:
+/// 1. wait (bounded) while a stale dying bridge still owns the pipe,
+/// 2. respawn the arch's bridge when no live child covers it,
+/// 3. wait briefly for the fresh (or takeover) child to serve the pipe so a
+///    retried operation lands on a live bridge.
+/// The bridge itself now exits promptly on shutdown and a fresh bridge child
+/// waits for the stale owner to leave, so this converges in seconds.
+fn repair_bridge(arch: &str) {
+    let name = bridge_name_for_arch(arch);
+    let deadline = Instant::now() + Duration::from_secs(12);
+    loop {
+        if bridge_client::bridge_health(arch) {
+            return; // someone healthy serves this pipe again
+        }
+        if !bridge_client::bridge_pipe_present_arch(arch) {
+            break; // stale owner gone
+        }
+        if Instant::now() >= deadline {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    {
+        let mut children = BRIDGE_CHILDREN.lock().unwrap();
+        prune_exited_children(&mut children);
+        if !live_child_for(&mut children, name) {
+            spawn_bridge(name, &mut children);
+        }
+    }
+    // A newly spawned child takes a moment to acquire the singleton; a child
+    // that was already waiting takes over as soon as the stale owner leaves.
+    // Give either one a short settle window before the retry.
+    let settle_deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < settle_deadline {
+        if bridge_client::bridge_health(arch) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// Run a bridge operation; on a shutdown/transport failure, repair the bridge
+/// (waiting out any stale dying owner) and retry the operation once.
+fn bridge_operation(arch: &str, run: impl Fn() -> Result<(), String>) -> Result<(), String> {
+    match run() {
+        Ok(()) => Ok(()),
+        Err(error) if needs_bridge_repair(&error) => {
+            bridge_client::frontend_log(&format!("[bridge] {arch} repair triggered: {error}"));
+            repair_bridge(arch);
+            run()
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn needs_bridge_repair(error: &str) -> bool {
+    bridge_client::bridge_shutdown_detected(error) || error.contains("open named pipe")
 }
 
 fn shutdown_bridges() {
@@ -43,10 +138,12 @@ fn shutdown_bridges() {
     bridge_client::bridge32_shutdown();
 
     if let Ok(mut children) = BRIDGE_CHILDREN.lock() {
-        let deadline = Instant::now() + Duration::from_secs(3);
+        // Bridges exit within a bounded grace period (pending-injection
+        // monitors give up ~2s after the shutdown event; the drain cap is 8s).
+        let deadline = Instant::now() + Duration::from_secs(6);
         loop {
             let mut all_exited = true;
-            for child in children.iter_mut() {
+            for (_, child) in children.iter_mut() {
                 match child.try_wait() {
                     Ok(Some(_)) => {}
                     Ok(None) | Err(_) => all_exited = false,
@@ -114,8 +211,8 @@ async fn get_system_stats() -> system_stats::SystemStats {
 #[tauri::command(async)]
 async fn bridge_inject(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
-        "x86" => bridge_client::bridge32_inject(pid),
-        "x64" => bridge_client::bridge64_inject(pid),
+        "x86" => bridge_operation("x86", || bridge_client::bridge32_inject(pid)),
+        "x64" => bridge_operation("x64", || bridge_client::bridge64_inject(pid)),
         _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
@@ -123,8 +220,8 @@ async fn bridge_inject(pid: u32, arch: String) -> Result<(), String> {
 #[tauri::command(async)]
 async fn bridge_enable(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
-        "x86" => bridge_client::bridge32_enable(pid),
-        "x64" => bridge_client::bridge64_enable(pid),
+        "x86" => bridge_operation("x86", || bridge_client::bridge32_enable(pid)),
+        "x64" => bridge_operation("x64", || bridge_client::bridge64_enable(pid)),
         _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }
@@ -132,8 +229,8 @@ async fn bridge_enable(pid: u32, arch: String) -> Result<(), String> {
 #[tauri::command(async)]
 async fn bridge_disable(pid: u32, arch: String) -> Result<(), String> {
     match arch.as_str() {
-        "x86" => bridge_client::bridge32_disable(pid),
-        "x64" => bridge_client::bridge64_disable(pid),
+        "x86" => bridge_operation("x86", || bridge_client::bridge32_disable(pid)),
+        "x64" => bridge_operation("x64", || bridge_client::bridge64_disable(pid)),
         _ => Err(format!("unsupported target architecture: {arch}")),
     }
 }

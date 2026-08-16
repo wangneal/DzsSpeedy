@@ -4,7 +4,9 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::Mutex;
 use windows::core::{HRESULT, PCWSTR};
-use windows::Win32::Foundation::{CloseHandle, ERROR_MORE_DATA, HANDLE, INVALID_HANDLE_VALUE};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_MORE_DATA, ERROR_PIPE_BUSY, HANDLE, INVALID_HANDLE_VALUE,
+};
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
@@ -350,11 +352,22 @@ mod tests {
             "BRIDGE_OUTCOME_UNKNOWN: INJECT 42: pipe ended"
         );
     }
+
+    #[test]
+    fn detects_bridge_shutdown_responses_for_repair() {
+        use super::bridge_shutdown_detected;
+        assert!(bridge_shutdown_detected(
+            "INJECT 42: bridge shutdown is in progress; operation was not started"
+        ));
+        assert!(bridge_shutdown_detected("GETSPEED: bridge is shutting down"));
+        assert!(!bridge_shutdown_detected("INJECT 42: remote LoadLibrary failed"));
+        assert!(!bridge_shutdown_detected("open named pipe failed after 40 attempts"));
+    }
 }
 
 /// 追加写诊断日志到 %TEMP%\dzsspeedy-frontend.log
 /// 让 release 模式也能取证。
-fn frontend_log(msg: &str) {
+pub(crate) fn frontend_log(msg: &str) {
     use std::io::Write;
     let path = std::env::temp_dir().join("dzsspeedy-frontend.log");
     if let Ok(mut f) = std::fs::OpenOptions::new()
@@ -375,6 +388,60 @@ fn frontend_log(msg: &str) {
             msg
         );
         let _ = f.flush();
+    }
+}
+
+/// True when a bridge error response means the bridge is shutting down —
+/// either genuinely mid-shutdown, or a stale dying bridge answered the probe.
+/// These errors trigger the GUI's bridge repair path.
+pub fn bridge_shutdown_detected(error: &str) -> bool {
+    error.contains("shutdown is in progress") || error.contains("is shutting down")
+}
+
+/// One-shot named-pipe presence probe. True when any instance of the bridge
+/// pipe exists (healthy, busy, or shutting down); false when no pipe is
+/// registered at all. Used by the repair path to distinguish "stale bridge
+/// still dying" from "bridge gone".
+pub fn bridge_pipe_present(pipe: &str) -> bool {
+    let name = to_wide(pipe);
+    match unsafe {
+        CreateFileW(
+            PCWSTR::from_raw(name.as_ptr()),
+            0xC0000000 | 0x40000000,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            Default::default(),
+            None,
+        )
+    } {
+        Ok(h) if h != INVALID_HANDLE_VALUE => {
+            unsafe {
+                let _ = CloseHandle(h);
+            }
+            true
+        }
+        // All pipe instances are connected to a client: the server exists.
+        Err(error) if error.code() == HRESULT::from_win32(ERROR_PIPE_BUSY.0) => true,
+        _ => false,
+    }
+}
+
+/// Per-arch health probe for the repair path.
+pub fn bridge_health(arch: &str) -> bool {
+    if arch == "x86" {
+        bridge32_health()
+    } else {
+        bridge64_health()
+    }
+}
+
+/// Per-arch pipe-presence probe for the repair path.
+pub fn bridge_pipe_present_arch(arch: &str) -> bool {
+    if arch == "x86" {
+        bridge_pipe_present(PIPE_32)
+    } else {
+        bridge_pipe_present(PIPE_64)
     }
 }
 

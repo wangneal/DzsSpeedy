@@ -648,6 +648,35 @@ fn active_remote_operations() -> u32 {
     REMOTE_OPERATION_STATE.load(Ordering::Acquire) & OPERATION_COUNT_MASK
 }
 
+/// How long shutdown waits for in-flight operation leases before exiting
+/// anyway. In-flight completions observe the shutdown bit and disable
+/// speedpatch, so exiting early is safe: it can never leave a target
+/// accelerated.
+const SHUTDOWN_DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(8);
+
+/// Wait until all remote-operation leases are released, or until `max_wait`
+/// elapses. Returns true when drained, false on deadline. This is the bound
+/// that prevents a stuck pending-injection monitor from pinning the bridge in
+/// its shutdown state forever (the "bridge shutdown is in progress" zombie).
+fn wait_for_operations_drain(state: &AtomicU32, max_wait: std::time::Duration) -> bool {
+    let deadline = std::time::Instant::now() + max_wait;
+    loop {
+        if state.load(Ordering::Acquire) & OPERATION_COUNT_MASK == 0 {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+}
+
+/// Commands whose responses must change to an explicit error once shutdown
+/// starts, so a dying bridge can never masquerade as healthy.
+fn command_is_shutdown_gated(cmd: &str) -> bool {
+    matches!(cmd, "GETSPEED" | "PING" | "VERSION")
+}
+
 fn finish_injection_success(pid: u32) {
     clear_injection_stage(pid);
     clear_injection_failure(pid);
@@ -1482,6 +1511,14 @@ struct PendingInjectionMonitor {
     initial_log_len: u64,
 }
 
+/// How long a pending-injection monitor keeps waiting for the target's
+/// terminal handshake after bridge shutdown starts. When the grace expires
+/// the monitor releases its hook handles, writes the final disable, and
+/// terminates — releasing the operation lease so the bridge can exit even
+/// when the target never publishes a handshake (hung/frozen target, hook
+/// callback never delivered).
+const SHUTDOWN_PENDING_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
+
 fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
     std::thread::spawn(move || {
         let PendingInjectionMonitor {
@@ -1498,6 +1535,7 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
         let mut terminal: Option<Result<(u32, SpeedpatchState), String>> = None;
         let mut terminal_without_completion = false;
         let mut last_cleanup_error = None;
+        let mut shutdown_grace_started: Option<std::time::Instant> = None;
         loop {
             match process.has_exited() {
                 Ok(true) => {
@@ -1677,10 +1715,36 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
             }
 
             if shutdown_requested() {
+                if shutdown_grace_started.is_none() {
+                    shutdown_grace_started = Some(std::time::Instant::now());
+                }
                 if let Err(error) = write_speedpatch_enabled(pid, false) {
                     dbg_log(&format!(
                         "pending hook monitor: shutdown disable pending for pid={pid}: {error}"
                     ));
+                }
+                if shutdown_grace_started
+                    .expect("shutdown grace timestamp set above")
+                    .elapsed()
+                    >= SHUTDOWN_PENDING_GRACE
+                {
+                    if let Some(mut owned_hooks) = hooks.take() {
+                        match owned_hooks.cleanup() {
+                            Ok(()) => dbg_log(&format!(
+                                "pending hook monitor: shutdown cleanup released hooks for pid={pid}"
+                            )),
+                            Err(error) => dbg_log(&format!(
+                                "pending hook monitor: shutdown hook cleanup still pending for pid={pid}: {error}"
+                            )),
+                        }
+                    }
+                    clear_injection_stage(pid);
+                    clear_injection_failure(pid);
+                    untrack_target(pid);
+                    dbg_log(&format!(
+                        "pending hook monitor: shutdown grace expired for pid={pid}; abandoning pending injection"
+                    ));
+                    return;
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -2234,6 +2298,14 @@ fn handle_command(line: &str) -> String {
     dbg_log(&format!("cmd in: {raw}"));
 
     let resp = match cmd.as_str() {
+        "SHUTDOWN" => "OK shutting down".into(),
+        // A bridge that is shutting down must not masquerade as healthy:
+        // health probes answer with an explicit error so clients (GUI health
+        // check, singleton takeover probe) can tell a dying bridge apart from
+        // a live one.
+        _ if shutdown_requested() && command_is_shutdown_gated(&cmd) => {
+            "ERROR bridge is shutting down".into()
+        }
         "INJECT" => {
             let pid: u32 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
 
@@ -2311,8 +2383,6 @@ fn handle_command(line: &str) -> String {
 
         "PING" | "VERSION" => "OK bridge-filemap-v3".into(),
 
-        "SHUTDOWN" => "OK shutting down".into(),
-
         _ => "ERROR unknown command".into(),
     };
 
@@ -2347,8 +2417,11 @@ fn shutdown_bridge() -> ! {
     request_shutdown();
     disable_tracked_targets();
 
-    while active_remote_operations() != 0 {
-        std::thread::sleep(std::time::Duration::from_millis(25));
+    if !wait_for_operations_drain(&REMOTE_OPERATION_STATE, SHUTDOWN_DRAIN_DEADLINE) {
+        dbg_log(&format!(
+            "bridge shutdown drain deadline reached with {} in-flight operation(s); exiting anyway (completion paths observe the shutdown bit)",
+            active_remote_operations()
+        ));
     }
 
     // An injection may have completed after the first snapshot. Its success
@@ -2362,6 +2435,12 @@ fn start_shutdown_watcher() -> Result<(), String> {
     let event_name = to_wide(SHUTDOWN_EVENT);
     let event = unsafe { CreateEventW(None, true, false, PCWSTR::from_raw(event_name.as_ptr())) }
         .map_err(|error| format!("CreateEventW({SHUTDOWN_EVENT}) failed: {error:?}"))?;
+    // The event is a manual-reset Global object. If it already exists from a
+    // previous bridge instance it may still be in the signaled state; reset it
+    // so a freshly started bridge never shuts down immediately at startup.
+    unsafe {
+        let _ = ResetEvent(event);
+    }
     let event_raw = event.0 as usize;
 
     std::thread::spawn(move || unsafe {
@@ -2584,11 +2663,25 @@ fn main() {
     }
 
     if !acquire_bridge_singleton() {
-        if existing_bridge_pipe_alive() {
-            std::process::exit(0);
+        // Another bridge instance owns the pipe. If it is healthy, defer to it
+        // (exit 0, as before). If it is shutting down or wedged, wait (bounded)
+        // for it to leave and then take over — otherwise a freshly started app
+        // binds to the dying bridge and every INJECT fails with "bridge
+        // shutdown is in progress" until the stale process is killed manually.
+        let takeover_deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
+        loop {
+            if existing_bridge_pipe_alive() {
+                std::process::exit(0);
+            }
+            if acquire_bridge_singleton() {
+                break;
+            }
+            if std::time::Instant::now() >= takeover_deadline {
+                dbg_log("singleton takeover deadline reached; giving up");
+                std::process::exit(2);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
-
-        std::process::exit(2);
     }
 
     if let Err(error) = start_shutdown_watcher() {
@@ -2603,10 +2696,11 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use super::{
-        classify_handshake, decode_initialize_exit_code, normalize_module_path,
-        ordered_hook_threads, persisted_initialization_failure, try_acquire_operation_slot,
-        HandshakeProgress, HookThreadCandidate, SpeedpatchHandshake, SpeedpatchState,
-        TargetProcessHandle, OPERATION_SHUTDOWN_BIT,
+        classify_handshake, command_is_shutdown_gated, decode_initialize_exit_code,
+        normalize_module_path, ordered_hook_threads, persisted_initialization_failure,
+        try_acquire_operation_slot, wait_for_operations_drain, HandshakeProgress,
+        HookThreadCandidate, SpeedpatchHandshake, SpeedpatchState, TargetProcessHandle,
+        OPERATION_SHUTDOWN_BIT,
     };
 
     #[test]
@@ -2750,6 +2844,51 @@ mod tests {
 
         assert!(try_acquire_operation_slot(&state).is_err());
         assert_eq!(state.load(Ordering::Acquire), OPERATION_SHUTDOWN_BIT | 1);
+    }
+
+    #[test]
+    fn drain_returns_immediately_when_no_leases_are_held() {
+        let state = AtomicU32::new(0);
+        let started = std::time::Instant::now();
+        assert!(wait_for_operations_drain(&state, std::time::Duration::from_secs(5)));
+        assert!(started.elapsed() < std::time::Duration::from_millis(500));
+    }
+
+    #[test]
+    fn drain_respects_deadline_when_a_lease_is_held_forever() {
+        // Regression test for the zombie-bridge root cause: a stuck
+        // pending-injection monitor holds its lease forever; shutdown must
+        // give up after a bounded wait instead of waiting forever.
+        let state = AtomicU32::new(0);
+        try_acquire_operation_slot(&state).expect("acquire held lease");
+        let started = std::time::Instant::now();
+        assert!(!wait_for_operations_drain(&state, std::time::Duration::from_millis(400)));
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed >= std::time::Duration::from_millis(350),
+            "drain returned too early: {elapsed:?}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(5),
+            "drain exceeded the deadline: {elapsed:?}"
+        );
+        state.fetch_sub(1, Ordering::AcqRel);
+        assert!(wait_for_operations_drain(&state, std::time::Duration::from_millis(400)));
+    }
+
+    #[test]
+    fn shutdown_gating_covers_health_probes_only() {
+        for probe in ["GETSPEED", "PING", "VERSION"] {
+            assert!(command_is_shutdown_gated(probe), "{probe} must be gated");
+        }
+        for command in [
+            "INJECT", "EJECT", "ENABLE", "DISABLE", "ISENABLED", "STATUS", "SETSPEED", "SHUTDOWN",
+        ] {
+            assert!(
+                !command_is_shutdown_gated(command),
+                "{command} must not be probe-gated"
+            );
+        }
     }
 
     #[test]
