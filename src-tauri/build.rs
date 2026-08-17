@@ -9,9 +9,21 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
+/// CI signs speedpatch32/64.dll after the first `tauri build --no-bundle`.
+/// A second `tauri build` would rerun this script (beforeBuildCommand
+/// rewrites dist/, tauri-build reruns) and copy over the signed DLLs with
+/// unsigned cmake outputs, so the packaging step sets
+/// DZSSPEED_SKIP_DLL_COPY=1 to keep the signed artifacts intact.
+fn dll_copy_disabled() -> bool {
+    std::env::var_os("DZSSPEED_SKIP_DLL_COPY").is_some()
+}
+
 /// Avoid replacing a DLL that a running target already maps when the build
 /// produced the same bytes. A changed mapped DLL must still fail explicitly.
 fn copy_if_changed(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
+    if dll_copy_disabled() {
+        return Ok(());
+    }
     if dst.exists() && fs::read(src)? == fs::read(dst)? {
         return Ok(());
     }
@@ -294,6 +306,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../src-bridge/third_party/minhook/");
     println!("cargo:rerun-if-changed=../src-bridge/src/");
     println!("cargo:rerun-if-changed=windows/app.manifest");
+    println!("cargo:rerun-if-env-changed=DZSSPEED_SKIP_DLL_COPY");
 
     // Copy binaries to resources folder for Tauri bundling
     let bin_dir = manifest_dir.join("binaries");
@@ -308,8 +321,10 @@ fn main() {
         let src = prof_dir.join(name);
         if src.exists() {
             let dst = bin_dir.join(name);
-            let _ = std::fs::copy(&src, &dst);
-            println!("cargo:info=  resource -> {}", dst.display());
+            if !dll_copy_disabled() {
+                let _ = std::fs::copy(&src, &dst);
+                println!("cargo:info=  resource -> {}", dst.display());
+            }
         }
     }
 

@@ -122,12 +122,14 @@ jobs:
             "signed $src -> $($st.Status)"
           }
 
-      - name: Build MSI (bundling only, no rebuild)
+      - name: Build MSI (keep signed DLLs)
         # A second plain `tauri build` reruns the build script (beforeBuildCommand
-        # rewrites dist/, tauri-build reruns, our build.rs copies the DLLs again)
-        # and would overwrite the signed DLLs with unsigned ones. --no-build
-        # skips cargo entirely and bundles the already-signed artifacts.
-        run: npx tauri build --bundles msi --no-build
+        # rewrites dist/, tauri-build reruns, build.rs copies the DLLs again) and
+        # would overwrite the signed DLLs with unsigned ones. The env var makes
+        # build.rs skip every DLL copy, so the already-signed artifacts are kept.
+        env:
+          DZSSPEED_SKIP_DLL_COPY: '1'
+        run: npx tauri build --bundles msi
 
       - name: Package portable release
         shell: pwsh
