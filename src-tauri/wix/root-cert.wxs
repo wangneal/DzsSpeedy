@@ -7,22 +7,19 @@
   trust chain of hook-injected DLLs, so the machine running DzsSpeedy must
   trust that root. This fragment:
 
-    - installs dzsspeedy-root.cer into the machine TRUSTED ROOT store
-      during install (deferred, non-impersonated = SYSTEM, so no extra UAC)
+    - installs the bundled dzsspeedy-root.cer (shipped via
+      bundle.resources -> INSTALLFOLDER, see tauri.conf.json) into the
+      machine TRUSTED ROOT store during install (deferred, non-impersonated
+      = SYSTEM, so no extra UAC)
     - removes the root (by CN) when the product is uninstalled
-    - is wired into the MSI via bundle.windows.wix.fragmentPaths +
-      componentGroupRefs in tauri.conf.json
 
   The .cer must match the root that signed the shipped speedpatch DLLs.
+  No File/Component elements live here on purpose: relative Source paths
+  break light.exe (it runs from target/release/wix/<arch>), so the cert is
+  a normal resource file instead.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
-    <ComponentGroup Id="DzsRootCert">
-      <Component Id="DzsRootCertFile" Directory="INSTALLFOLDER" Guid="8C7E3B2A-D093-4F31-9E46-3F2C91A7D504">
-        <File Id="DzsRootCertFile" Name="dzsspeedy-root.cer" Source="wix/dzsspeedy-root.cer" KeyPath="yes" />
-      </Component>
-    </ComponentGroup>
-
     <!-- add: certutil -addstore Root "[INSTALLFOLDER]dzsspeedy-root.cer" -->
     <CustomAction Id="DzsAddRootCert" Directory="INSTALLFOLDER"
       ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -addstore -f Root &quot;[INSTALLFOLDER]dzsspeedy-root.cer&quot;"

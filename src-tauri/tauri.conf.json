@@ -32,12 +32,12 @@
     "windows": {
       "wix": {
         "language": "zh-CN",
-        "fragmentPaths": ["wix/root-cert.wxs"],
-        "componentGroupRefs": ["DzsRootCert"]
+        "fragmentPaths": ["wix/root-cert.wxs"]
       }
     },
     "resources": {
-      "binaries/*": "./"
+      "binaries/*": "./",
+      "wix/dzsspeedy-root.cer": "./"
     },
     "icon": [
       "icons/32x32.png",
