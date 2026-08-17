@@ -98,12 +98,18 @@ jobs:
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'dzsspeedy-sign.pfx'
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_B64))
+          # Sign both locations: target/release (portable zip) and binaries
+          # (the MSI bundles binaries/*).
+          $targets = @()
           foreach ($dll in 'speedpatch32.dll', 'speedpatch64.dll') {
-            $src = "src-tauri/target/release/$dll"
+            $targets += "src-tauri/target/release/$dll"
+            $targets += "src-tauri/binaries/$dll"
+          }
+          foreach ($src in $targets) {
             if (-not (Test-Path $src)) { throw "missing built DLL: $src" }
             $out = "$src.signed"
             & osslsigncode sign -pkcs12 $pfx -pass $env:SIGN_PASS -h sha256 -in $src -out $out
-            if ($LASTEXITCODE -ne 0) { throw "osslsigncode failed for $dll" }
+            if ($LASTEXITCODE -ne 0) { throw "osslsigncode failed for $src" }
             Move-Item $out $src -Force
             $st = (Get-AuthenticodeSignature $src)
             # The CI runner does not trust our root yet, so the status here is
@@ -111,9 +117,9 @@ jobs:
             # valid; the MSI installs the root on the user machine. Fail only if
             # the signature block is actually absent.
             if ($st.Status -eq 'NotSigned' -or -not $st.SignerCertificate) {
-              throw "signature block missing after signing: $dll ($($st.Status))"
+              throw "signature block missing after signing: $src ($($st.Status))"
             }
-            "signed $dll -> $($st.Status)"
+            "signed $src -> $($st.Status)"
           }
 
       - name: Build MSI (reuses pre-signed DLLs; no source change so no rebuild)
