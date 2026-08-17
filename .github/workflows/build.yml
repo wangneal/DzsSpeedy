@@ -129,6 +129,8 @@ jobs:
         # build.rs skip every DLL copy, so the already-signed artifacts are kept.
         env:
           DZSSPEED_SKIP_DLL_COPY: '1'
+          # surface light.exe stdout/stderr (bundler logs it at debug level)
+          RUST_LOG: tauri_bundler=debug
         run: npx tauri build --bundles msi
 
       - name: Package portable release
