@@ -122,8 +122,12 @@ jobs:
             "signed $src -> $($st.Status)"
           }
 
-      - name: Build MSI (reuses pre-signed DLLs; no source change so no rebuild)
-        run: npx tauri build --bundles msi
+      - name: Build MSI (bundling only, no rebuild)
+        # A second plain `tauri build` reruns the build script (beforeBuildCommand
+        # rewrites dist/, tauri-build reruns, our build.rs copies the DLLs again)
+        # and would overwrite the signed DLLs with unsigned ones. --no-build
+        # skips cargo entirely and bundles the already-signed artifacts.
+        run: npx tauri build --bundles msi --no-build
 
       - name: Package portable release
         shell: pwsh
