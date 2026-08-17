@@ -79,8 +79,39 @@ jobs:
           $cargo = [regex]::Replace($cargo, '(?m)^version = "[^"]+"', ('version = "' + $version + '"'), 1)
           Set-Content $cargoPath $cargo -Encoding utf8
 
-      - name: Build
-        run: npx tauri build
+      - name: Install osslsigncode
+        shell: pwsh
+        run: choco install osslsigncode -y --no-progress
+
+      - name: Build (unbundled, produces DLLs/EXEs)
+        run: npx tauri build --no-bundle
+
+      - name: Sign speedpatch DLLs
+        shell: pwsh
+        env:
+          SIGN_PFX_B64: ${{ secrets.DZSSPEED_SIGN_PFX }}
+          SIGN_PASS: ${{ secrets.DZSSPEED_SIGN_PASS }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:SIGN_PFX_B64 -or -not $env:SIGN_PASS) {
+            throw 'Missing DZSSPEED_SIGN_PFX / DZSSPEED_SIGN_PASS secrets'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'dzsspeedy-sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_B64))
+          foreach ($dll in 'speedpatch32.dll', 'speedpatch64.dll') {
+            $src = "src-tauri/target/release/$dll"
+            if (-not (Test-Path $src)) { throw "missing built DLL: $src" }
+            $out = "$src.signed"
+            & osslsigncode sign -pkcs12 $pfx -pass $env:SIGN_PASS -h sha256 -in $src -out $out
+            if ($LASTEXITCODE -ne 0) { throw "osslsigncode failed for $dll" }
+            Move-Item $out $src -Force
+            $st = (Get-AuthenticodeSignature $src).Status
+            if ($st -ne 'Valid') { throw "signature not Valid after signing: $dll ($st)" }
+            "signed $dll -> $st"
+          }
+
+      - name: Build MSI (reuses pre-signed DLLs; no source change so no rebuild)
+        run: npx tauri build --bundles msi
 
       - name: Package portable release
         shell: pwsh

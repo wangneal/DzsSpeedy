@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DzsSpeedy root-certificate handling for the MSI installer.
+
+  The speedpatch DLLs are signed by a self-built root CA (see
+  _tools/codesign/sign-speedpatch.ps1). TerSafe validates the Authenticode
+  trust chain of hook-injected DLLs, so the machine running DzsSpeedy must
+  trust that root. This fragment:
+
+    - installs dzsspeedy-root.cer into the machine TRUSTED ROOT store
+      during install (deferred, non-impersonated = SYSTEM, so no extra UAC)
+    - removes the root (by CN) when the product is uninstalled
+    - is wired into the MSI via bundle.windows.wix.fragmentPaths +
+      componentGroupRefs in tauri.conf.json
+
+  The .cer must match the root that signed the shipped speedpatch DLLs.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <ComponentGroup Id="DzsRootCert">
+      <Component Id="DzsRootCertFile" Directory="INSTALLFOLDER" Guid="8C7E3B2A-D093-4F31-9E46-3F2C91A7D504">
+        <File Id="DzsRootCertFile" Name="dzsspeedy-root.cer" Source="wix/dzsspeedy-root.cer" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- add: certutil -addstore Root "[INSTALLFOLDER]dzsspeedy-root.cer" -->
+    <CustomAction Id="DzsAddRootCert" Directory="INSTALLFOLDER"
+      ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -addstore -f Root &quot;[INSTALLFOLDER]dzsspeedy-root.cer&quot;"
+      Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <!-- remove (by CN, fingerprint-agnostic): certutil -delstore Root "DzsSpeedy Root CA" -->
+    <CustomAction Id="DzsDelRootCert" Directory="INSTALLFOLDER"
+      ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -delstore Root &quot;DzsSpeedy Root CA&quot;"
+      Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="DzsAddRootCert" After="InstallFinalize">NOT Installed AND NOT REMOVE</Custom>
+      <Custom Action="DzsDelRootCert" After="InstallFinalize">REMOVE~="ALL"</Custom>
+    </InstallExecuteSequence>
+  </Fragment>
+</Wix>
