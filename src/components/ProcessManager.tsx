@@ -287,6 +287,26 @@ export default function ProcessManager() {
     setSpeedMap(next);
   }
 
+  function updateProcessList(nextProcesses: ProcessInfo[]) {
+    setProcesses(nextProcesses);
+
+    const livePids = new Set(nextProcesses.map(process => process.pid));
+    const stalePids = [...speedMapRef.current.keys()].filter(pid => !livePids.has(pid));
+    if (stalePids.length === 0) return;
+
+    // Invalidate in-flight status results before removing a PID. If the PID is
+    // reused later, an old response must not update the new process's state.
+    for (const pid of stalePids) {
+      bridgeOperationVersionRef.current.set(pid, (bridgeOperationVersionRef.current.get(pid) ?? 0) + 1);
+      statusErrorRef.current.delete(pid);
+    }
+    updateSpeedMap(current => {
+      const next = new Map(current);
+      for (const pid of stalePids) next.delete(pid);
+      return next;
+    });
+  }
+
   function beginBridgeOperation(pid: number) {
     const version = (bridgeOperationVersionRef.current.get(pid) ?? 0) + 1;
     bridgeOperationVersionRef.current.set(pid, version);
@@ -393,14 +413,14 @@ export default function ProcessManager() {
         });
         const error = await invokeBridgeCommand("bridge_disable", { pid, arch });
         if (error) {
+          updateSpeedMap(prev => {
+            const next = new Map(prev);
+            next.set(pid, cur!);
+            return next;
+          });
           if (bridgeOutcomeNeedsStatus(error)) {
             notify(error, "warning", 10000);
           } else {
-            updateSpeedMap(prev => {
-              const next = new Map(prev);
-              next.set(pid, cur!);
-              return next;
-            });
             notify(`${t("process.disableFail")}: ${error}`, "error", 10000);
           }
         } else {
@@ -413,9 +433,14 @@ export default function ProcessManager() {
   }
 
   // Data fetch
-  useEffect(() => { invoke<ProcessInfo[]>("get_process_list").then(setProcesses).catch(() => {}); }, []);
-  useInterval(async () => { try { setProcesses(await invoke<ProcessInfo[]>("get_process_list_fast")); } catch {} }, 3000);
-  useEffect(() => { if (search.trim()) { invoke<ProcessInfo[]>("get_process_list").then(setProcesses).catch(() => {}); } }, [search]);
+  useEffect(() => { invoke<ProcessInfo[]>("get_process_list").then(updateProcessList).catch(() => {}); }, []);
+  useInterval(async () => { try { updateProcessList(await invoke<ProcessInfo[]>("get_process_list_fast")); } catch {} }, 3000);
+  useEffect(() => { if (search.trim()) { invoke<ProcessInfo[]>("get_process_list").then(updateProcessList).catch(() => {}); } }, [search]);
+  useEffect(() => {
+    if (selectedPid !== null && !processes.some(process => process.pid === selectedPid)) {
+      setSelectedPid(null);
+    }
+  }, [processes, selectedPid]);
 
   // Filter
   const filtered = useMemo(() => {
@@ -442,7 +467,7 @@ export default function ProcessManager() {
   useInterval(async () => {
     if (statusPollInFlightRef.current || bridgeCommandPidsRef.current.size > 0) return;
     const snapshot = [...speedMapRef.current.entries()]
-      .filter(([, state]) => state.phase !== "failed")
+      .filter(([, state]) => state.phase === "enabled" || state.phase === "initializing")
       .map(([pid, state]) => ({
         pid,
         state,
@@ -485,6 +510,7 @@ export default function ProcessManager() {
     if (
       !p ||
       bridgeCommandPidsRef.current.has(p.pid) ||
+      speedMapRef.current.get(p.pid)?.phase === "disabled" ||
       speedMapRef.current.get(p.pid)?.phase === "failed"
     ) return;
     let cancelled = false;

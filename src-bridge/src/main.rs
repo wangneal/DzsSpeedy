@@ -34,7 +34,7 @@ use windows::core::{s, HRESULT, PCWSTR};
 use windows::Win32::Foundation::{
     CloseHandle, FreeLibrary, GetLastError, LocalFree, BOOL, ERROR_ALREADY_EXISTS,
     ERROR_BAD_LENGTH, ERROR_FILE_NOT_FOUND, ERROR_INVALID_PARAMETER, ERROR_IO_PENDING,
-    ERROR_NO_MORE_FILES, ERROR_PIPE_CONNECTED, HANDLE, HINSTANCE, HLOCAL, HWND,
+    ERROR_NO_MORE_FILES, ERROR_PARTIAL_COPY, ERROR_PIPE_CONNECTED, HANDLE, HINSTANCE, HLOCAL, HWND,
     INVALID_HANDLE_VALUE, LPARAM, LRESULT, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT, WPARAM,
 };
 
@@ -2093,6 +2093,22 @@ fn module_text(buffer: &[u16]) -> String {
         .to_string()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ModuleSnapshotErrorKind {
+    TargetGone,
+    Fatal,
+}
+
+fn module_snapshot_error_kind(error: HRESULT) -> ModuleSnapshotErrorKind {
+    if error == HRESULT::from_win32(ERROR_INVALID_PARAMETER.0)
+        || error == HRESULT::from_win32(ERROR_PARTIAL_COPY.0)
+    {
+        ModuleSnapshotErrorKind::TargetGone
+    } else {
+        ModuleSnapshotErrorKind::Fatal
+    }
+}
+
 fn create_module_snapshot(pid: u32) -> Result<Option<HANDLE>, String> {
     let mut last_error = None;
     for attempt in 0..8 {
@@ -2104,9 +2120,12 @@ fn create_module_snapshot(pid: u32) -> Result<Option<HANDLE>, String> {
                 last_error = Some(error);
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
-            Err(error) if error.code() == HRESULT::from_win32(ERROR_INVALID_PARAMETER.0) => {
-                // Windows returns ERROR_INVALID_PARAMETER once a PID no longer exists.
-                // Status polling should report that as not injected, not as a transport error.
+            Err(error)
+                if module_snapshot_error_kind(error.code()) == ModuleSnapshotErrorKind::TargetGone =>
+            {
+                // During process teardown Windows can report either an invalid PID or
+                // ERROR_PARTIAL_COPY while the module list is disappearing. Status polling
+                // should treat both as a missing target rather than surface a transient error.
                 return Ok(None);
             }
             Err(error) => {
@@ -2143,7 +2162,9 @@ fn find_remote_module(
         unsafe {
             let _ = CloseHandle(snapshot);
         }
-        if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) {
+        if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0)
+            || module_snapshot_error_kind(error.code()) == ModuleSnapshotErrorKind::TargetGone
+        {
             return Ok(None);
         }
         return Err(format!("Module32FirstW(pid={pid}) failed: {error:?}"));
@@ -2168,7 +2189,10 @@ fn find_remote_module(
 
         match unsafe { Module32NextW(snapshot, &mut entry) } {
             Ok(()) => {}
-            Err(error) if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) => {
+            Err(error)
+                if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0)
+                    || module_snapshot_error_kind(error.code()) == ModuleSnapshotErrorKind::TargetGone =>
+            {
                 break Ok(None)
             }
             Err(error) => break Err(format!("Module32NextW(pid={pid}) failed: {error:?}")),
@@ -2803,12 +2827,14 @@ fn main() {
 mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
+    use windows::core::HRESULT;
+
     use super::{
         classify_handshake, command_is_shutdown_gated, decode_initialize_exit_code,
-        normalize_module_path, ordered_hook_threads, persisted_initialization_failure,
-        try_acquire_operation_slot, wait_for_operations_drain, HandshakeProgress,
-        HookThreadCandidate, SpeedpatchHandshake, SpeedpatchState, TargetProcessHandle,
-        OPERATION_SHUTDOWN_BIT,
+        module_snapshot_error_kind, normalize_module_path, ordered_hook_threads,
+        persisted_initialization_failure, try_acquire_operation_slot, wait_for_operations_drain,
+        HandshakeProgress, HookThreadCandidate, ModuleSnapshotErrorKind, SpeedpatchHandshake,
+        SpeedpatchState, TargetProcessHandle, OPERATION_SHUTDOWN_BIT,
     };
 
     #[test]
@@ -3054,6 +3080,28 @@ mod tests {
 
         assert!(error.detail.contains("completion event"));
         assert!(error.detail.contains("win32_error=5"));
+    }
+
+    #[test]
+    fn treats_process_teardown_snapshot_errors_as_target_gone() {
+        assert_eq!(
+            module_snapshot_error_kind(HRESULT::from_win32(
+                windows::Win32::Foundation::ERROR_INVALID_PARAMETER.0,
+            )),
+            ModuleSnapshotErrorKind::TargetGone
+        );
+        assert_eq!(
+            module_snapshot_error_kind(HRESULT::from_win32(
+                windows::Win32::Foundation::ERROR_PARTIAL_COPY.0,
+            )),
+            ModuleSnapshotErrorKind::TargetGone
+        );
+        assert_eq!(
+            module_snapshot_error_kind(HRESULT::from_win32(
+                windows::Win32::Foundation::ERROR_ACCESS_DENIED.0,
+            )),
+            ModuleSnapshotErrorKind::Fatal
+        );
     }
 
     #[test]
