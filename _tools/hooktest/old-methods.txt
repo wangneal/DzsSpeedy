@@ -1,0 +1,47 @@
+4://!   INJECT <pid>  EJECT <pid>  ENABLE <pid>  DISABLE <pid>
+20:use windows::Win32::System::Threading::{
+21:    CreateRemoteThread, GetCurrentProcess, OpenProcess, QueryFullProcessImageNameW,
+22:    WaitForSingleObject, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
+26:    VirtualAllocEx, VirtualFreeEx,
+29:use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
+35:    GetModuleHandleW, GetProcAddress, LoadLibraryW,
+83:/// Try injecting via LoadLibraryW, fall back to LoadLibraryA.
+84:fn do_inject(pid: u32) -> Result<(), String> {
+91:            PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION
+95:    }.map_err(|e| format!("OpenProcess: {e:?}"))?;
+97:    // Try LoadLibraryW first
+98:    if try_inject_impl(&h_proc, &dll_str, "LoadLibraryW", true) {
+103:    // Fallback: LoadLibraryA
+104:    if try_inject_impl(&h_proc, &dll_str, "LoadLibraryA", false) {
+110:    Err("both LoadLibraryW and LoadLibraryA injection failed".into())
+113:/// Attempt injection with a specific LoadLibrary variant.
+114:/// `wide` = true → use wide-char path (LoadLibraryW), false → ANSI (LoadLibraryA).
+115:fn try_inject_impl(h_proc: &HANDLE, dll_path: &str, fn_name: &str, wide: bool) -> bool {
+118:            .flat_map(|c| c.to_le_bytes())
+130:        VirtualAllocEx(*h_proc, None, path_len, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)
+135:        let _ = WriteProcessMemory(*h_proc, remote_mem, path_bytes.as_ptr() as _, path_len, None);
+152:    let h_thread = match unsafe {
+153:        CreateRemoteThread(*h_proc, None, 0,
+163:    // Wait for LoadLibrary to complete and check result
+164:    unsafe { WaitForSingleObject(h_thread, 5000); }
+168:        use windows::Win32::System::Threading::GetExitCodeThread;
+169:        GetExitCodeThread(h_thread, &mut exit_code)
+172:    unsafe { VirtualFreeEx(*h_proc, remote_mem, 0, MEM_RELEASE); let _ = CloseHandle(h_thread); }
+174:    // LoadLibrary returns NULL (0) on failure, non-zero HMODULE on success
+183:        .map_err(|e| format!("CreateToolhelp32Snapshot: {e:?}"))?;
+207:            PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION,
+210:    }.map_err(|e| format!("OpenProcess: {e:?}"))?;
+214:    }.map_err(|_| "GetModuleHandleW failed")?;
+218:    let h_thread = unsafe {
+219:        CreateRemoteThread(h_proc, None, 0,
+221:    }.map_err(|e| format!("CreateRemoteThread: {e:?}"))?;
+223:    unsafe { WaitForSingleObject(h_thread, 5000); }
+224:    unsafe { let _ = CloseHandle(h_thread); let _ = CloseHandle(h_proc); }
+231:        let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
+242:        let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
+253:        let h = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())).map_err(|e| format!("LoadLibraryW: {e:?}"))?;
+263:        let Ok(h) = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) else { return };
+273:        let Ok(h) = LoadLibraryW(PCWSTR::from_raw(dll_wide.as_ptr())) else { return 1.0 };
+287:        "INJECT" => {
+289:            match do_inject(pid) { Ok(()) => "OK".into(), Err(e) => format!("ERROR {e}") }
+348:            std::thread::sleep(std::time::Duration::from_secs(1));

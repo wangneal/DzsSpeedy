@@ -1,0 +1,313 @@
+﻿!This program cannot be run in DOS mode.
+=qRich
+.text
+`.rdata
+@.data
+SHARESEG}
+.rsrc
+@.reloc
+SVWh p
+\SVW
+u<j\W
+t"Ht
+USQR
+T$ QR
+D$$t
+D$ 9
+QhHr
+D$0j
+L$$Qh
+L$,j
+QSUV3
+to95
+tT954p
+tL95
+_^][d
+T$$QWVR
+;:u1
+L$$PWVQ
+s-PW
+D$,VP
+l$(V
+L$(W
+L$,;
+_^][d
+\$,U
+_^][d
+_^[d
+;0uS
+_^][d
+_^][d
+_][d
+QQhXr
+WhHr
+uFhXr
+u*hXr
+t6VP
+QQSVW
+8csm
+SVW3
+NWVS
+u7WPS
+u&WVS
+_^[]
+SVWj
+L$(Q
+Rj@VW
+L$ Q
+D$ P
+l$<VW
+j VP
+D$ Pj@j V
+D$$t0
+|$DSWP
+L$0Qj@SW
+T$ 3
+t39L$
+t-9L$
+D$ @
+9L$0
+9L$0t3;
+t+UWP
+T$DR
+T$,PQR
+n9L$0t;;
+t3UWP
+T$DR
+T$,PQR
+_^]3
+L$$d
+D$D3
+|$(;
+D$03
+T$$UWR
+D$DP
+D$,QRP
+9t$ t?
+t/PQ
+t$LQ
+T$DR
+_^]3
+L$$d
+|$Dj
+_^]3
+L$$d
+L$LSQW
+L$$u+
+_^]3
+L$$d
+L$4_^]
+T$\QR
+D$$UP
++^][Y
+Ht%Ht
+_^][
+_^][
+_^][
+8u&P
+8u&P
+t!<%t
+timeGetTime
+timeSetEvent
+WINMM.dll
+MFC42.DLL
+_ftol
+wcscpy
+wcsrchr
+wcscat
+rand
+srand
+time
+_except_handler3
+__CxxFrameHandler
+_EH_prolog
+MSVCRT.dll
+?terminate@@YAXXZ
+__dllonexit
+_onexit
+free
+_initterm
+malloc
+_adjust_fdiv
+??1type_info@@UAE@XZ
+GetTickCount
+QueryPerformanceCounter
+ReleaseMutex
+GetCurrentProcessId
+WaitForSingleObject
+CloseHandle
+CreateMutexA
+GetModuleHandleA
+Sleep
+LocalFree
+LocalAlloc
+KERNEL32.dll
+SetTimer
+CallNextHookEx
+SendMessageA
+PostMessageA
+PostThreadMessageA
+GetWindowThreadProcessId
+IsWindowVisible
+SetWindowsHookExA
+UnhookWindowsHookEx
+EnumWindows
+GetDesktopWindow
+FindWindowA
+USER32.dll
+??1_Lockit@std@@QAE@XZ
+??0_Lockit@std@@QAE@XZ
+MSVCP60.dll
+VirtualProtect
+FlushInstructionCache
+GetCurrentProcess
+SetLastError
+inproc.dll
+SpeederTimeMutex
+inproc.dll
+Shell_TrayWnd
+SpeederMutex
+inproc
+.?AVCNoTrackObject@@
+.?AVAFX_MODULE_STATE@@
+.?AV_AFX_DLL_MODULE_STATE@@
+.?AVtype_info@@
+!0Q0
+1!1'1I1P1Y1
+2>2S2
+333n3w3
+3 4A4P4U4^4d4t4}4
+5:5I5W5]5d5
+676A6I6O6U6Z6`6k6p6v6
+7=7H7P7\7b7n7
+8"8A8O8
+8!9*939:9B9K9S9Z9i9
+;6;<;I;T;Z;_;u;{;
+<*<H<N<T<\<c<h<o<
+=(=C=M=S=^=
+>/>6>Q>Z>`>k>q>
+?,?6?>?D?I?R?e?k?v?
+0'010q0
+3&353G3
+4F4\4
+595V5m5
+7B7v7
+7)8[8
+919:9`9{9
+;5;E;
+<5<E<z<
+>C>Y>
+>R?X?^?d?j?p?v?|?
+0$0*00060<0B0Q0a0p0
+102<2F2
+4#4P4X4^4i4v4~4
+5'6E6f6
+7S7q7
+7B8v8
+8?9]9
+=(>;>
+1*1d1
+2$2*20262<2B2H2N2T2Z2`2f2l2y2
+353:3U3Z3u3z3
+2 2$2(2,2024282<2@2D2H2L2P2T2X2\2`2d2h2l2p2t2x2|2
+4$4,444<4D4L4T4\4d4l4t4|4
+5$5,545<5D5L5T5\5d5l5t5|5
+6$6,646<6D6L6T6\6d6l6t6|6
+7$7,747<7D7L7T7\7d7l7t7|7
+8$8,848<8D8L8T8\8d8l8t8|8
+9$9,949<9D9L9T9\9d9l9t9|9
+:$:,:4:<:D:L:T:\:d:l:t:|:
+;$;,;4;<;D;L;T;\;d;l;t;|;
+<$<,<4<<<D<L<T<\<d<l<t<|<
+=$=,=4=<=D=L=T=\=d=l=t=|=
+>$>,>4><>D>L>T>\>d>l>t>|>
+?$?,?4?<?D?L?T?\?d?l?t?|?
+0$0,040<0D0L0T0\0d0l0t0|0
+1$1,141<1D1L1T1\1d1l1t1|1
+2$2,242<2D2L2T2\2d2l2t2|2
+3$3,343<3D3L3T3\3d3l3t3|3
+4(4@4D4H4\4l4p4x4
+545@5\5d5p5
+6,686T6`6|6
+Y0W03
+>0 0
+ln S
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+070425000000Z
+190709184036Z0L1
+WoSign, Inc.1&0$
+WoSign Code Signing Authority0
+Y7QH
+'!7f@
+EQPy
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0
+_!eB
+%[%&z
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+990709183120Z
+190709184036Z0
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0)
+k%%-Q
+CN>k'
+T bli
+If>PF
+cq81b
+WoSign, Inc.1&0$
+WoSign Code Signing Authority0
+100113000000Z
+110113235959Z0
+Fujian1
+Fuzhou110/
+(Fuzhou TianxiaChuangshi Digital Co.,Ltd.1503
+,Class 3 - for Microsoft Authenticode Signing110/
+(Fuzhou TianxiaChuangshi Digital Co.,Ltd.0
+-7`kIl
+=,5gG
+;0907
+0(0&
+http://www.wosign.com/cps/0<
+50301
++http://crl.wosign.com/WoSignCodeSigning.crl0G
+;0907
++http://crt.wosign.com/WoSignCodeSigning.crt0
+O=.I
+7W`J$%
+YO|c
+f[pnn0
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+070430000000Z
+120429235959Z0J1
+WoSign, Inc.1$0"
+WoSign Time Stamping Signer0
+&tyK+{
+edIBJ
+G0E0C
+0301
+%http://www.comodogroup.com/repository0B
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0
+ Au|
+0`0L1
+WoSign, Inc.1&0$
+WoSign Code Signing Authority
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object
+100115033447Z0#
+?/x_

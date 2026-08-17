@@ -1,0 +1,113 @@
+﻿=== start 2026-08-17T00:12:06.1837323+08:00 ===
+spawned_bridge pid=11400
+[00:12:09] GETSPEED -> OK 1.000000
+[00:12:24] INJECT 11416 -> ERROR INJECTION_PENDING: SetWindowsHookExW installed for pid=11416, hooked_threads=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764], posted_threads=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764], but SP_HookProc did not publish its handshake within 15s. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-11416.log; callback_thread=0
+[00:12:26] STATUS 11416 -> OK INITIALIZING
+[00:12:28] STATUS 11416 -> OK INITIALIZING
+[00:12:30] STATUS 11416 -> OK INITIALIZING
+[00:12:32] STATUS 11416 -> OK INITIALIZING
+[00:12:34] STATUS 11416 -> OK INITIALIZING
+[00:12:36] STATUS 11416 -> OK INITIALIZING
+[00:12:38] STATUS 11416 -> OK INITIALIZING
+[00:12:40] STATUS 11416 -> OK INITIALIZING
+[00:12:42] STATUS 11416 -> OK INITIALIZING
+[00:12:44] STATUS 11416 -> OK INITIALIZING
+[00:12:46] STATUS 11416 -> OK INITIALIZING
+[00:12:48] STATUS 11416 -> OK INITIALIZING
+[00:12:50] STATUS 11416 -> OK INITIALIZING
+[00:12:52] STATUS 11416 -> OK INITIALIZING
+[00:12:55] STATUS 11416 -> OK INITIALIZING
+[00:12:57] STATUS 11416 -> OK INITIALIZING
+[00:12:59] STATUS 11416 -> OK INITIALIZING
+[00:13:01] STATUS 11416 -> OK INITIALIZING
+[00:13:03] STATUS 11416 -> OK INITIALIZING
+[00:13:05] STATUS 11416 -> OK INITIALIZING
+[00:13:07] STATUS 11416 -> OK INITIALIZING
+[00:13:09] STATUS 11416 -> OK INITIALIZING
+[00:13:11] STATUS 11416 -> OK INITIALIZING
+[00:13:13] STATUS 11416 -> OK INITIALIZING
+[00:13:15] STATUS 11416 -> OK INITIALIZING
+[00:13:16] EJECT 11416 -> ERROR OpenFileMapping(DzsSpeedy.11416): Error { code: HRESULT(0x80070002), message: "系统找不到指定的文件。" }
+=== bridge log tail ===
+[1786896662.395] [pid=16072] cmd in: STATUS 11416
+[1786896662.396] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896664.404] [pid=16072] cmd in: STATUS 11416
+[1786896664.404] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896666.411] [pid=16072] cmd in: STATUS 11416
+[1786896666.412] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896668.414] [pid=16072] cmd in: STATUS 11416
+[1786896668.415] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896670.422] [pid=16072] cmd in: STATUS 11416
+[1786896670.423] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896672.432] [pid=16072] cmd in: STATUS 11416
+[1786896672.432] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896674.445] [pid=16072] cmd in: STATUS 11416
+[1786896674.445] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896676.453] [pid=16072] cmd in: STATUS 11416
+[1786896676.454] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896678.460] [pid=16072] cmd in: STATUS 11416
+[1786896678.460] [pid=16072] cmd out: STATUS 11416 -> OK NOT_INJECTED
+[1786896678.463] [pid=16072] cmd in: EJECT 11416
+[1786896678.464] [pid=16072] do_eject pid=11416: acceleration disabled; DLL remains resident until target exit
+[1786896678.464] [pid=16072] cmd out: EJECT 11416 -> OK
+[1786896726.408] [pid=11400] main: bridge launched, exe=D:\Program Files\DzsSpeedy\bridge32.exe args=["D:\\Program Files\\DzsSpeedy\\bridge32.exe"]
+[1786896729.572] [pid=11400] cmd in: GETSPEED
+[1786896729.575] [pid=11400] cmd out: GETSPEED -> OK 1.000000
+[1786896729.604] [pid=11400] cmd in: INJECT 11416
+[1786896729.647] [pid=11400] inject_via_windows_hook: installed pid=11416 candidates=[14884, 2236, 14760, 13456, 15612, 16196, 7784, 7796, 7800, 7776, 7272, 7764, 7768, 7792, 7812, 7180, 7756, 8424, 6748, 15180, 3960, 7780, 15268, 15952, 4884, 13172, 6832, 11872, 7220, 12684, 12284, 12248, 10452, 11244, 14552, 11144, 6200, 15940, 13224, 1752, 13428, 16348, 13064, 8236, 11776, 11008, 13768, 12956, 11928, 12724, 8440, 2556, 15520, 16048, 11700, 11464, 13040, 13148, 1856, 14840, 2468, 7132, 14952, 13240, 3540, 10604, 8416, 14380, 12824, 11888, 13936, 13308, 11196, 1808, 2172, 404, 14916, 10096, 10928, 15800, 15076, 6116, 15972, 13956, 14524, 15652, 2896, 12584, 8764] hooked=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764] install_errors=["thread=13456: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=16196: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7784: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7796: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7800: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7776: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7272: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7764: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7768: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7792: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7812: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7180: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7756: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=8424: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=6748: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15180: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=3960: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7780: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15268: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=4884: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13172: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=6832: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11872: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7220: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12684: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12284: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12248: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=10452: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11244: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=14552: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11144: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=6200: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15940: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13224: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=1752: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13428: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=16348: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13064: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=8236: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11776: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11008: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12956: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12724: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=8440: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=2556: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=16048: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11700: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11464: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13040: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13148: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=1856: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=2468: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=7132: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=14952: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13240: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=3540: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=10604: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=8416: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=14380: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=12824: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11888: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13936: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13308: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=11196: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=1808: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=2172: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=404: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=14916: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=10096: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=10928: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15800: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15076: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=15972: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=13956: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=14524: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }", "thread=2896: Error { code: HRESULT(0x80070057), message: \"鍙傛暟閿欒銆俓" }"]
+[1786896729.647] [pid=11400] inject_via_windows_hook: woke pid=11416 posted=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764] post_errors=[]
+[1786896744.802] [pid=11400] cmd out: INJECT 11416 -> ERROR INJECTION_PENDING: SetWindowsHookExW installed for pid=11416, hooked_threads=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764], posted_threads=[14884, 2236, 14760, 15612, 15952, 13768, 11928, 15520, 14840, 6116, 15652, 12584, 8764], but SP_HookProc did not publish its handshake within 15s. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-11416.log; callback_thread=0
+[1786896746.836] [pid=11400] cmd in: STATUS 11416
+[1786896746.836] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896748.869] [pid=11400] cmd in: STATUS 11416
+[1786896748.869] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896750.878] [pid=11400] cmd in: STATUS 11416
+[1786896750.879] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896752.883] [pid=11400] cmd in: STATUS 11416
+[1786896752.884] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896754.898] [pid=11400] cmd in: STATUS 11416
+[1786896754.898] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896756.907] [pid=11400] cmd in: STATUS 11416
+[1786896756.908] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896758.916] [pid=11400] cmd in: STATUS 11416
+[1786896758.916] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896760.932] [pid=11400] cmd in: STATUS 11416
+[1786896760.933] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896762.948] [pid=11400] cmd in: STATUS 11416
+[1786896762.949] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896764.955] [pid=11400] cmd in: STATUS 11416
+[1786896764.956] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896766.959] [pid=11400] cmd in: STATUS 11416
+[1786896766.960] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896768.971] [pid=11400] cmd in: STATUS 11416
+[1786896768.971] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896770.987] [pid=11400] cmd in: STATUS 11416
+[1786896770.987] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896772.997] [pid=11400] cmd in: STATUS 11416
+[1786896772.997] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896775.001] [pid=11400] cmd in: STATUS 11416
+[1786896775.002] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896777.010] [pid=11400] cmd in: STATUS 11416
+[1786896777.010] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896779.017] [pid=11400] cmd in: STATUS 11416
+[1786896779.017] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896781.025] [pid=11400] cmd in: STATUS 11416
+[1786896781.025] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896783.072] [pid=11400] cmd in: STATUS 11416
+[1786896783.072] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896785.087] [pid=11400] cmd in: STATUS 11416
+[1786896785.088] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896787.104] [pid=11400] cmd in: STATUS 11416
+[1786896787.105] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896789.117] [pid=11400] cmd in: STATUS 11416
+[1786896789.118] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896791.129] [pid=11400] cmd in: STATUS 11416
+[1786896791.129] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896793.144] [pid=11400] cmd in: STATUS 11416
+[1786896793.144] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896795.155] [pid=11400] cmd in: STATUS 11416
+[1786896795.155] [pid=11400] cmd out: STATUS 11416 -> OK INITIALIZING
+[1786896795.170] [pid=11400] cmd in: EJECT 11416
+[1786896796.635] [pid=11400] cmd out: EJECT 11416 -> ERROR OpenFileMapping(DzsSpeedy.11416): Error { code: HRESULT(0x80070002), message: "绯荤粺鎵句笉鍒版寚瀹氱殑鏂囦欢銆? }
+=== speedpatch logs ===
+=== end 2026-08-17T00:13:16.7581856+08:00 ===

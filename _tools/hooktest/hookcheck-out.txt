@@ -1,0 +1,17 @@
+target bases: user32=759b0000 ntdll=77a50000 kernelbase=76ff0000
+__ClientLoadLibrary          export not found
+__ClientHookProc             export not found
+__ClientGetMessageHookProc   export not found
+__ClientCallWinEventProc     export not found
+__ClientSetWindowLongPtr     export not found
+ntdll.dll!LdrLoadDll         off=0004e090 local=8b ff 55 8b ec 83 e4 f8 81 ec 74 01 00 00 a1 70 
+  target(ok=1 same=YES)=8b ff 55 8b ec 83 e4 f8 81 ec 74 01 00 00 a1 70 
+LdrpLoadDll                  export not found
+ntdll.dll!NtMapViewOfSection off=00073460 local=b8 28 00 00 00 ba 50 91 ad 77 ff d2 c2 28 00 90 
+  target(ok=1 same=YES)=b8 28 00 00 00 ba 50 91 ad 77 ff d2 c2 28 00 90 
+ntdll.dll!LdrUnloadDll       off=0004d070 local=8b ff 55 8b ec 83 e4 f8 51 80 3d a8 5d b7 77 00 
+  target(ok=1 same=YES)=8b ff 55 8b ec 83 e4 f8 51 80 3d a8 5d b7 77 00 
+kernelbase.dll!LoadLibraryExW off=00111ae0 local=8b ff 55 8b ec 83 e4 f8 8b 45 08 83 ec 1c 53 56 
+  target(ok=1 same=YES)=8b ff 55 8b ec 83 e4 f8 8b 45 08 83 ec 1c 53 56 
+kernelbase.dll!LoadLibraryW  off=00142300 local=8b ff 55 8b ec 6a 00 6a 00 ff 75 08 e8 cf f7 fc 
+  target(ok=1 same=YES)=8b ff 55 8b ec 6a 00 6a 00 ff 75 08 e8 cf f7 fc 

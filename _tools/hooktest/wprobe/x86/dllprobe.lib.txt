@@ -1,0 +1,34 @@
+﻿!<arch>
+/               0           0     0     0       146       `
+__IMPORT_DESCRIPTOR_dllprobe
+__NULL_IMPORT_DESCRIPTOR
+dllprobe_NULL_THUNK_DATA
+__imp__ProbeHookProc@12
+_ProbeHookProc@12
+/               0           0     0     0       156       `
+_ProbeHookProc@12
+__IMPORT_DESCRIPTOR_dllprobe
+__NULL_IMPORT_DESCRIPTOR
+__imp__ProbeHookProc@12
+dllprobe_NULL_THUNK_DATA
+dllprobe.dll/   0           0     0     644     373       `
+.idata$2
+.idata$6
+dllprobe.dll
+.idata$2
+.idata$6
+.idata$4
+.idata$5
+__IMPORT_DESCRIPTOR_dllprobe
+__NULL_IMPORT_DESCRIPTOR
+dllprobe_NULL_THUNK_DATA
+dllprobe.dll/   0           0     0     644     127       `
+.idata$3
+__NULL_IMPORT_DESCRIPTOR
+dllprobe.dll/   0           0     0     644     156       `
+.idata$5
+.idata$4
+dllprobe_NULL_THUNK_DATA
+dllprobe.dll/   0           0     0     644     51        `
+_ProbeHookProc@12
+dllprobe.dll

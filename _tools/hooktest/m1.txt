@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directory Listing</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background-color: #fafafa;
+        color: #333;
+        margin: 2rem;
+	max-width: 100vw;
+	min-height: 100vh;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+      }
+
+      .warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+      }
+
+      .table-outer {
+        width: 100%;
+        overflow: auto hidden;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+      }
+
+      .nowrap {
+	white-space: nowrap;
+      }
+
+      th,
+      td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f5f5f5;
+        border-bottom: 2px solid #ddd;
+        font-weight: 600;
+      }
+
+      th:hover {
+        background-color: #e9ecef;
+        cursor: pointer;
+      }
+
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      tr:hover {
+        background-color: #e9ecef;
+      }
+
+      a {
+        color: #007acc;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      td:last-child {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      td:nth-child(2) {
+        width: 25%;
+        color: #666;
+      }
+
+      td:nth-child(3) {
+        width: 15%;
+        color: #666;
+      }
+
+      th.sorted-asc::after {
+        content: " ▲";
+      }
+
+      th.sorted-desc::after {
+        content: " ▼";
+      }
+
+      .footer {
+        text-align: center;
+        opacity: 0.5;
+        transition: opacity ease-in-out 0.5s;
+      }
+
+      .footer:hover {
+        opacity: 1;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #1a1a1a;
+          color: #e0e0e0;
+        }
+
+        h1 {
+          color: #f5f5f5;
+        }
+
+        .warning {
+          background-color: #3d2f00;
+          color: #ffd700;
+          border: 1px solid #5a4a00;
+        }
+
+        table {
+          background-color: #2d2d2d;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        th {
+          background-color: #252525;
+          border-bottom: 2px solid #404040;
+          color: #f5f5f5;
+        }
+
+        th:hover {
+          background-color: #333333;
+        }
+
+        tr:nth-child(even) {
+          background-color: #262626;
+        }
+
+        tr:hover {
+          background-color: #333333;
+        }
+
+        a {
+          color: #5eb3ff;
+        }
+
+        a:hover {
+          color: #7dc4ff;
+        }
+
+        td:nth-child(2) {
+          color: #b0b0b0;
+        }
+
+        td:nth-child(3) {
+          color: #b0b0b0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Directory Listing of msys2/distrib/x86_64</h1>
+
+
+    <div class="table-outer">
+    <table id="file-table">
+      <thead>
+        <tr>
+          <th data-type="text">Name</th>
+          <th data-type="date">Modified (UTC)</th>
+          <th data-type="size">Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="parent-dir">
+          <td><a href="..">..</a></td>
+          <td></td>
+          <td></td>
+        </tr>
+         
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.sfx.exe">msys2-base-x86_64-20240507.sfx.exe</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:27</td>
+          <td title="49525691 bytes">
+            47.23 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.sfx.exe.sig">msys2-base-x86_64-20240507.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:28</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.tar.xz">msys2-base-x86_64-20240507.tar.xz</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:18</td>
+          <td title="49686808 bytes">
+            47.39 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.tar.xz.sig">msys2-base-x86_64-20240507.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:19</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.tar.zst">msys2-base-x86_64-20240507.tar.zst</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:21</td>
+          <td title="50620233 bytes">
+            48.28 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240507.tar.zst.sig">msys2-base-x86_64-20240507.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:22</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.sfx.exe">msys2-base-x86_64-20240727.sfx.exe</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:39</td>
+          <td title="48774477 bytes">
+            46.51 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.sfx.exe.sig">msys2-base-x86_64-20240727.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:40</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.tar.xz">msys2-base-x86_64-20240727.tar.xz</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:28</td>
+          <td title="48958128 bytes">
+            46.69 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.tar.xz.sig">msys2-base-x86_64-20240727.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:29</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.tar.zst">msys2-base-x86_64-20240727.tar.zst</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:32</td>
+          <td title="49814442 bytes">
+            47.51 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20240727.tar.zst.sig">msys2-base-x86_64-20240727.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:32</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.sfx.exe">msys2-base-x86_64-20241116.sfx.exe</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:13</td>
+          <td title="49114767 bytes">
+            46.84 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.sfx.exe.sig">msys2-base-x86_64-20241116.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:14</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.tar.xz">msys2-base-x86_64-20241116.tar.xz</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:02</td>
+          <td title="49343552 bytes">
+            47.06 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.tar.xz.sig">msys2-base-x86_64-20241116.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:03</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.tar.zst">msys2-base-x86_64-20241116.tar.zst</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:06</td>
+          <td title="50113854 bytes">
+            47.79 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241116.tar.zst.sig">msys2-base-x86_64-20241116.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:06</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.sfx.exe">msys2-base-x86_64-20241208.sfx.exe</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:14</td>
+          <td title="49112402 bytes">
+            46.84 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.sfx.exe.sig">msys2-base-x86_64-20241208.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:15</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.tar.xz">msys2-base-x86_64-20241208.tar.xz</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:04</td>
+          <td title="49332840 bytes">
+            47.05 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.tar.xz.sig">msys2-base-x86_64-20241208.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:04</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.tar.zst">msys2-base-x86_64-20241208.tar.zst</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:07</td>
+          <td title="50111248 bytes">
+            47.79 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20241208.tar.zst.sig">msys2-base-x86_64-20241208.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:08</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.sfx.exe">msys2-base-x86_64-20250221.sfx.exe</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:40</td>
+          <td title="50092039 bytes">
+            47.77 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.sfx.exe.sig">msys2-base-x86_64-20250221.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:41</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.tar.xz">msys2-base-x86_64-20250221.tar.xz</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:28</td>
+          <td title="50089256 bytes">
+            47.77 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.tar.xz.sig">msys2-base-x86_64-20250221.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:28</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.tar.zst">msys2-base-x86_64-20250221.tar.zst</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:32</td>
+          <td title="50987353 bytes">
+            48.63 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250221.tar.zst.sig">msys2-base-x86_64-20250221.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:32</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.sfx.exe">msys2-base-x86_64-20250622.sfx.exe</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:53</td>
+          <td title="50683010 bytes">
+            48.34 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.sfx.exe.sig">msys2-base-x86_64-20250622.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:53</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.tar.xz">msys2-base-x86_64-20250622.tar.xz</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:41</td>
+          <td title="50985424 bytes">
+            48.62 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.tar.xz.sig">msys2-base-x86_64-20250622.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:42</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.tar.zst">msys2-base-x86_64-20250622.tar.zst</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:44</td>
+          <td title="51869807 bytes">
+            49.47 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250622.tar.zst.sig">msys2-base-x86_64-20250622.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:45</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.sfx.exe">msys2-base-x86_64-20250830.sfx.exe</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:48</td>
+          <td title="52472940 bytes">
+            50.04 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.sfx.exe.sig">msys2-base-x86_64-20250830.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:49</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.tar.xz">msys2-base-x86_64-20250830.tar.xz</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:41</td>
+          <td title="52886052 bytes">
+            50.44 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.tar.xz.sig">msys2-base-x86_64-20250830.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:41</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.tar.zst">msys2-base-x86_64-20250830.tar.zst</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:43</td>
+          <td title="53764526 bytes">
+            51.27 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20250830.tar.zst.sig">msys2-base-x86_64-20250830.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:43</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.sfx.exe">msys2-base-x86_64-20251213.sfx.exe</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:48</td>
+          <td title="52398491 bytes">
+            49.97 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.sfx.exe.sig">msys2-base-x86_64-20251213.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:49</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.tar.xz">msys2-base-x86_64-20251213.tar.xz</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:33</td>
+          <td title="52993124 bytes">
+            50.54 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.tar.xz.sig">msys2-base-x86_64-20251213.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:34</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.tar.zst">msys2-base-x86_64-20251213.tar.zst</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:43</td>
+          <td title="53930933 bytes">
+            51.43 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20251213.tar.zst.sig">msys2-base-x86_64-20251213.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:44</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.sfx.exe">msys2-base-x86_64-20260322.sfx.exe</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:55</td>
+          <td title="52820994 bytes">
+            50.37 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.sfx.exe.sig">msys2-base-x86_64-20260322.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:56</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.tar.xz">msys2-base-x86_64-20260322.tar.xz</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:48</td>
+          <td title="53466096 bytes">
+            50.99 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.tar.xz.sig">msys2-base-x86_64-20260322.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:48</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.tar.zst">msys2-base-x86_64-20260322.tar.zst</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:50</td>
+          <td title="54342013 bytes">
+            51.82 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260322.tar.zst.sig">msys2-base-x86_64-20260322.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:51</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.sfx.exe">msys2-base-x86_64-20260611.sfx.exe</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:21</td>
+          <td title="52898952 bytes">
+            50.45 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.sfx.exe.sig">msys2-base-x86_64-20260611.sfx.exe.sig</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:21</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.tar.xz">msys2-base-x86_64-20260611.tar.xz</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:15</td>
+          <td title="53555380 bytes">
+            51.07 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.tar.xz.sig">msys2-base-x86_64-20260611.tar.xz.sig</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:15</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.tar.zst">msys2-base-x86_64-20260611.tar.zst</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:16</td>
+          <td title="54503668 bytes">
+            51.98 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-base-x86_64-20260611.tar.zst.sig">msys2-base-x86_64-20260611.tar.zst.sig</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:17</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20240507.exe">msys2-x86_64-20240507.exe</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:24</td>
+          <td title="83374709 bytes">
+            79.51 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20240507.exe.sig">msys2-x86_64-20240507.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-05-07 06:05:25</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20240727.exe">msys2-x86_64-20240727.exe</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:36</td>
+          <td title="83299730 bytes">
+            79.44 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20240727.exe.sig">msys2-x86_64-20240727.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-07-27 13:17:37</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20241116.exe">msys2-x86_64-20241116.exe</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:10</td>
+          <td title="83612498 bytes">
+            79.74 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20241116.exe.sig">msys2-x86_64-20241116.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-11-16 18:50:11</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20241208.exe">msys2-x86_64-20241208.exe</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:11</td>
+          <td title="83616298 bytes">
+            79.74 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20241208.exe.sig">msys2-x86_64-20241208.exe.sig</a>
+          </td>
+          <td class="nowrap">2024-12-08 11:32:12</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250221.exe">msys2-x86_64-20250221.exe</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:37</td>
+          <td title="85960333 bytes">
+            81.98 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250221.exe.sig">msys2-x86_64-20250221.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-02-21 11:32:38</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250622.exe">msys2-x86_64-20250622.exe</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:49</td>
+          <td title="91977539 bytes">
+            87.72 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250622.exe.sig">msys2-x86_64-20250622.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-06-22 18:03:50</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250830.exe">msys2-x86_64-20250830.exe</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:45</td>
+          <td title="93680251 bytes">
+            89.34 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20250830.exe.sig">msys2-x86_64-20250830.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-08-30 15:35:46</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20251213.exe">msys2-x86_64-20251213.exe</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:46</td>
+          <td title="93604786 bytes">
+            89.27 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20251213.exe.sig">msys2-x86_64-20251213.exe.sig</a>
+          </td>
+          <td class="nowrap">2025-12-13 17:12:47</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20260322.exe">msys2-x86_64-20260322.exe</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:53</td>
+          <td title="94002009 bytes">
+            89.65 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20260322.exe.sig">msys2-x86_64-20260322.exe.sig</a>
+          </td>
+          <td class="nowrap">2026-03-22 15:40:54</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20260611.exe">msys2-x86_64-20260611.exe</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:19</td>
+          <td title="94016640 bytes">
+            89.66 MiB
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            <a href="/msys2/distrib/x86_64/msys2-x86_64-20260611.exe.sig">msys2-x86_64-20260611.exe.sig</a>
+          </td>
+          <td class="nowrap">2026-06-12 11:30:19</td>
+          <td title="566 bytes">
+            566 B
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="footer">Powered by <a href="https://github.com/ustclug/yadex">yadex</a></p>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const table = document.getElementById("file-table");
+        const headers = table.querySelectorAll("th");
+        const tbody = table.querySelector("tbody");
+
+        headers.forEach((header, index) => {
+          header.addEventListener("click", () => {
+            const type = header.dataset.type;
+            const rows = Array.from(
+              tbody.querySelectorAll("tr:not(#parent-dir)")
+            );
+            const isAscending = !header.classList.contains("sorted-asc");
+
+            headers.forEach((h) =>
+              h.classList.remove("sorted-asc", "sorted-desc")
+            );
+
+            rows.sort((a, b) => {
+              const cellA = a.children[index].innerText.trim();
+              const cellB = b.children[index].innerText.trim();
+
+              let valA = cellA;
+              let valB = cellB;
+
+              if (type === "size") {
+                valA = parseFloat(a.children[index].title) || 0;
+                valB = parseFloat(b.children[index].title) || 0;
+              } else if (type === "date") {
+                valA = new Date(cellA).getTime() || 0;
+                valB = new Date(cellB).getTime() || 0;
+              } else {
+                valA = cellA.toLowerCase();
+                valB = cellB.toLowerCase();
+                if (valA.endsWith("/") && !valB.endsWith("/")) return isAscending ? -1 : 1;
+                if (!valA.endsWith("/") && valB.endsWith("/")) return isAscending ? 1 : -1;
+              }
+
+              if (valA < valB) return isAscending ? -1 : 1;
+              if (valA > valB) return isAscending ? 1 : -1;
+              return 0;
+            });
+
+            header.classList.add(isAscending ? "sorted-asc" : "sorted-desc");
+
+            const parentRow = tbody.querySelector("#parent-dir");
+            tbody.innerHTML = "";
+            if (parentRow) tbody.appendChild(parentRow);
+            rows.forEach((row) => tbody.appendChild(row));
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

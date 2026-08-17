@@ -1,0 +1,9 @@
+﻿=== positive control 2026-08-17T09:28:12.4342493+08:00 ===
+fixture_pid=3512
+bridge_pid=11792
+[09:28:15] GETSPEED -> OK 1.000000
+[09:28:15] INJECT 3512 -> OK
+inject_ms=101
+[09:28:17] STATUS 3512 -> OK ENABLED
+[09:28:18] SHUTDOWN -> OK shutting down
+=== end 2026-08-17T09:28:20.0613467+08:00 ===

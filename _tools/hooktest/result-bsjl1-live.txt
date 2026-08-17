@@ -1,0 +1,22 @@
+﻿=== bsjl1 live monitor start 2026-08-17T12:11:51.0782386+08:00 ===
+[12:11:51] asura alive pid=14800 modules=5 no hook yet
+[12:12:21] asura alive pid=14800 modules=5 no hook yet
+[12:12:51] asura alive pid=14800 modules=5 no hook yet
+[12:13:21] asura alive pid=14800 modules=5 no hook yet
+[12:13:52] asura alive pid=14800 modules=5 no hook yet
+[12:14:22] asura alive pid=14800 modules=5 no hook yet
+[12:14:52] asura alive pid=14800 modules=5 no hook yet
+[12:15:22] asura alive pid=14800 modules=5 no hook yet
+[12:15:52] asura alive pid=14800 modules=5 no hook yet
+[12:16:23] asura alive pid=14800 modules=5 no hook yet
+[12:16:53] asura alive pid=14800 modules=5 no hook yet
+[12:17:23] asura alive pid=14800 modules=5 no hook yet
+[12:17:53] asura alive pid=14800 modules=5 no hook yet
+[12:18:23] asura alive pid=14800 modules=5 no hook yet
+[12:18:54] asura alive pid=14800 modules=5 no hook yet
+[12:19:24] asura alive pid=14800 modules=5 no hook yet
+[12:19:54] asura alive pid=14800 modules=5 no hook yet
+[12:20:24] asura alive pid=14800 modules=5 no hook yet
+[12:20:54] asura alive pid=14800 modules=5 no hook yet
+[12:21:25] asura alive pid=14800 modules=5 no hook yet
+=== end 2026-08-17T12:21:55.2101773+08:00 found=False ===

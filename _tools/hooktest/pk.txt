@@ -1,0 +1,4 @@
+e62803f fix: stabilize single hook injection lifecycle
+7fb6472 fix: stabilize single-path injection lifecycle
+d3d3f44 fix: stabilize x86 hook injection lifecycle
+3bcb4f7 init: OpenSpeedy v3.1.0

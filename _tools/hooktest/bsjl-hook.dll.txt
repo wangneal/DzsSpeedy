@@ -1,0 +1,355 @@
+﻿!This program cannot be run in DOS mode.
+w7bGw
+wRich
+.text
+`.rdata
+@.data
+.rsrc
+@.reloc
+QQSVWd
+X_^[]
+SVWUj
+t.;t$$t(
+u7WPS
+u&WVS
+eYt,F
+YY_^[
+sO;>|C;~
+QQSVW
+t:jtj
+u?jtj
+QQSVW
+QQSVW
+HSVWh
+?=t"U
+8"uF@
+SS@SSPVSS
+t#SSUP
+t$$VSS
+_^][YY
+t>j,P
+WufS3
+^}%95
+SVWj 
+SVWj 
+VC20XC00U
+uA;5t
+Wj@Y3
+SUVWu
+VWuBh<
+HSVHWtgHHtF
+uFWWj
+"WWShp
+tMWWS
++ttHHtd
+PPPPPPPP
+PPPPPPPP
+FGQPS
+GAIsProcessorFeaturePresent
+KERNEL32
+e+000
+__GLOBAL_HEAP_SELECTED
+__MSVCRT_HEAP_SELECT
+runtime error 
+TLOSS error
+SING error
+DOMAIN error
+R6028
+- unable to initialize heap
+R6027
+- not enough space for lowio initialization
+R6026
+- not enough space for stdio initialization
+R6025
+- pure virtual function call
+R6024
+- not enough space for _onexit/atexit table
+R6019
+- unable to open console device
+R6018
+- unexpected heap error
+R6017
+- unexpected multithread lock error
+R6016
+- not enough space for thread data
+abnormal program termination
+R6009
+- not enough space for environment
+R6008
+- not enough space for arguments
+R6002
+- floating point not loaded
+Microsoft Visual C++ Runtime Library
+Runtime Error!
+Program: 
+<program name unknown>
+GetLastActivePopup
+GetActiveWindow
+MessageBoxA
+1#QNAN
+1#INF
+1#IND
+1#SNAN
+H:mm:ss
+dddd, MMMM dd, yyyy
+M/d/yy
+December
+November
+October
+September
+August
+April
+March
+February
+January
+Saturday
+Friday
+Thursday
+Wednesday
+Tuesday
+Monday
+Sunday
+SunMonTueWedThuFriSat
+JanFebMarAprMayJunJulAugSepOctNovDec
+QueryPerformanceCounter
+ReadProcessMemory
+GetCurrentProcess
+GetProcAddress
+LoadLibraryA
+GetTickCount
+GetCurrentProcessId
+MapViewOfFile
+CreateFileMappingA
+KERNEL32.dll
+GetDesktopWindow
+GetWindowThreadProcessId
+FindWindowA
+USER32.dll
+timeGetTime
+WINMM.dll
+RtlUnwind
+GetCommandLineA
+GetVersion
+GetModuleHandleA
+GetCurrentThreadId
+TlsSetValue
+TlsAlloc
+TlsFree
+SetLastError
+TlsGetValue
+GetLastError
+ExitProcess
+TerminateProcess
+SetHandleCount
+GetStdHandle
+GetFileType
+GetStartupInfoA
+DeleteCriticalSection
+GetModuleFileNameA
+FreeEnvironmentStringsA
+FreeEnvironmentStringsW
+WideCharToMultiByte
+GetEnvironmentStrings
+GetEnvironmentStringsW
+GetEnvironmentVariableA
+GetVersionExA
+HeapDestroy
+HeapCreate
+VirtualFree
+HeapFree
+WriteFile
+InterlockedDecrement
+InterlockedIncrement
+SetUnhandledExceptionFilter
+IsBadReadPtr
+IsBadWritePtr
+IsBadCodePtr
+HeapAlloc
+InitializeCriticalSection
+EnterCriticalSection
+LeaveCriticalSection
+GetCPInfo
+GetACP
+GetOEMCP
+VirtualAlloc
+HeapReAlloc
+MultiByteToWideChar
+GetStringTypeA
+GetStringTypeW
+LCMapStringA
+LCMapStringW
+hook.dll
+SetTimer
+user32.dll
+QueryPerformanceCounter
+GetTickCount
+kernel32.dll
+timeGetTime
+winmm.dll
+Shell_TrayWnd
+Code To High Mem
+z?aUY
+zc%C1
+-64OS
+R0W0r1w1
+4b5z5
+6!6&6N6e6n6
+7+707A7F7d7
+8$80858:8F8K8P8
+=#=+=6=<=B=L=d=i=s=
+=Z>u>
+?7?R?b?
+<%<5<;<C<a<g<x<
+=,=2=>=C=
+>G>S>Z>j>p>w>
+>1?7?Y?m?
+0-0Q0{0
+1"111c1s1
+2a2h2
+3&4.4H4T4d4
+5D5a5
+7(787?7F7L7s7
+8$828=8P8w8
+9"979M9T9
+:;;V;^;d;j;
+4 4$4(4,4044484
+5 5'5,50545Q5{5
+6 6$6(6,6(7>7K7Q7V7]7c7v7
+7*9/9|9
+:*:d:j:r:z:
+;5;P;`;f;r;w;
+;<<B<n<
+>!>S>e>t>
+? ?+?Y?e?o?z?
+1$1E1Q1c1q1
+252[2u2|2
+2Z3e3
+4 4$4(4,404z4
+9`;n;t;
+<.<4<?<D<M<R<b<h<
+<R=??J?R?e?k?
+1-131C1z1
+12282C2I2e2k2u2{2
+2W3q3
+597B7H7T7Y7c7j7r7x7
+9;9@9
+;$;D;
+<&<4<R<o<
+030~0
+1>1f1
+3W4[4_4c4g4k4o4s4w4{4
+455O5`5}5
+7C7^7f7l7r7
+8N8";6;
+d1h1x1
+5$505<5|5
+50787h7|7
+141<1D1L1T1\1d1l1t1|1
+444D4T4P6T6X6\6
+9 9$9(9,9094989<9@9D9H9L9P9T9X9\9`9d9h9l9p9t9x9|9
+9H=L=
+Z0X03
+Western Cape1
+Durbanville1
+Thawte1
+Thawte Certification1
+Thawte Timestamping CA0
+121221000000Z
+201230235959Z0^1
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G20
+]jxdE
+&0$0"
+http://ocsp.thawte.com0
+80604
+.http://crl.thawte.com/ThawteTimestampingCA.crl0
+TimeStamp-2048-10
+VeriSign, Inc.1705
+.Class 3 Public Primary Certification Authority0
+061108000000Z
+211107235959Z0
+VeriSign, Inc.1
+VeriSign Trust Network1:08
+1(c) 2006 VeriSign, Inc. - For authorized use only1E0C
+<VeriSign Class 3 Public Primary Certification Authority - G50
+CcjRK
+*0(0&
+ http://crl.verisign.com/pca3.crl0
+60402
+https://www.verisign.com/cps0
+3130m
+[0Y0W0U
+image/gif0!0
+#http://logo.verisign.com/vslogo.gif04
+(0&0$
+http://ocsp.verisign.com0
+YjAF~
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G20
+121018000000Z
+201229235959Z0b1
+Symantec Corporation1402
++Symantec Time Stamping Services Signer - G40
+g0e0*
+http://ts-ocsp.ws.symantec.com07
++http://ts-aia.ws.symantec.com/tss-ca-g2.cer0<
+50301
++http://ts-crl.ws.symantec.com/tss-ca-g2.crl0(
+TimeStamp-2048-20
+\vnO^
+y3+.{
+>"hcS
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA0
+130107000000Z
+150107235959Z0
+FuJian1
+FuZhou1-0+
+5Digital ID Class 3 - Microsoft Software Validation v21
+;AMcn
+d:1v.I
+90705
+/http://csc3-2010-crl.verisign.com/CSC3-2010.crl0D
+=0;09
+https://www.verisign.com/rpa0
+e0c0$
+http://ocsp.verisign.com0;
+/http://csc3-2010-aia.verisign.com/CSC3-2010.cer0
+q4r||5
+ifi"M
+VeriSign, Inc.1
+VeriSign Trust Network1:08
+1(c) 2006 VeriSign, Inc. - For authorized use only1E0C
+<VeriSign Class 3 Public Primary Certification Authority - G50
+100208000000Z
+200207235959Z0
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA0
+z;T0S
+i0g0e
+https://www.verisign.com/cps0*
+https://www.verisign.com/rpa0
+[0Y0W0U
+image/gif0!0
+#http://logo.verisign.com/vslogo.gif04
+-0+0)
+#http://crl.verisign.com/pca3-g5.crl04
+(0&0$
+http://ocsp.verisign.com0
+VeriSignMPKI-2-80
+G8J-l
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA
+www.fzcyjh.com0
+([F(b]
+0r0^1
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G2
+130427025525Z0#
+)Z>B`

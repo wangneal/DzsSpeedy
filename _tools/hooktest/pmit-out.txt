@@ -1,0 +1,7 @@
+Wow64 status=0x00000000 wow64=2920448
+Protection status=0x00000000 type=0 signer=0
+DynamicCode            sub=2 status=0x00000000 ret=4 f0=0x0000007a f1=0x00000000
+ExtPointDisable        sub=6 status=0x00000000 ret=4 f0=0x0000007a f1=0x00000000
+BinarySignature        sub=8 status=0x00000000 ret=4 f0=0x0000007a f1=0x00000000
+ImageLoad              sub=10 status=0x00000000 ret=4 f0=0x0000007a f1=0x00000000
+ChildProcess           sub=13 status=0x00000000 ret=4 f0=0x0000007a f1=0x00000000

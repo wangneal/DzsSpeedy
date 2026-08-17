@@ -1,0 +1,86 @@
+﻿=== repro start 2026-08-17T11:25:14.5638658+08:00 target_pid=6464 arch=x86 ===
+spawned_bridge pid=13160
+pipe_connected_ms=10
+[11:25:14] GETSPEED -> OK 1.000000 (11ms)
+[11:25:22] INJECT 6464 -> ERROR INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0 (8099ms)
+inject_elapsed_ms=8100
+[11:25:24] STATUS 6464 -> OK INITIALIZING (0ms)
+[11:25:27] STATUS 6464 -> OK INITIALIZING (0ms)
+[11:25:29] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:31] STATUS 6464 -> OK INITIALIZING (0ms)
+[11:25:33] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:35] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:37] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:39] STATUS 6464 -> OK INITIALIZING (0ms)
+[11:25:41] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:43] STATUS 6464 -> OK INITIALIZING (0ms)
+[11:25:45] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:47] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:49] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:51] STATUS 6464 -> OK INITIALIZING (1ms)
+[11:25:53] STATUS 6464 -> OK FAILED injection did not complete within 30s for pid=6464: SP_HookProc never published a handshake and speedpatch32.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0 (1ms)
+[11:25:53] EJECT 6464 -> ERROR injection did not complete within 30s for pid=6464: SP_HookProc never published a handshake and speedpatch32.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0 (1ms)
+[11:25:53] SHUTDOWN -> OK shutting down (0ms)
+--- bridge log tail (new since test start) ---
+[1786937114.769] [pid=13160] main: bridge launched, exe=D:\Program Files\DzsSpeedy\bridge32.exe args=["D:\\Program Files\\DzsSpeedy\\bridge32.exe"]
+[1786937114.869] [pid=13160] cmd in: GETSPEED
+[1786937114.873] [pid=13160] cmd out: GETSPEED -> OK 1.000000
+[1786937114.881] [pid=13160] cmd in: INJECT 6464
+[1786937114.935] [pid=13160] inject_via_windows_hook: installed pid=6464 candidates=[11616, 14664, 13616, 15224, 13000, 1432, 6476, 16340, 12732, 13524, 14808, 10428, 14788, 8004, 6172, 13736, 13592, 2408, 10372, 1936, 14924, 3992, 15068, 9348, 12120, 14464, 14908, 13552, 4572, 15660, 11912, 16116, 12200, 15688, 3024, 2880, 11132, 6596, 11796, 10776, 15720, 7800, 13744, 14456, 14584, 11944, 3548, 10440, 7596, 13876, 2576, 10388, 5644, 9988, 6764, 7180, 15700, 16212, 11784, 11008, 16068, 1440, 15392, 10300, 9936, 16320, 15252, 6504, 15456, 2868, 916, 10764] hooked=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764] install_errors=["thread=15224: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=1432: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=6476: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16340: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=12732: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13524: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14808: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10428: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14788: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=8004: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=6172: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13736: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13592: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=2408: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10372: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=1936: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14924: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=3992: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15068: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=9348: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=12120: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14464: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14908: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=4572: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=11912: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16116: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=12200: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15688: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=3024: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=2880: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=11132: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=6596: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10776: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=7800: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13744: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14456: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=14584: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=11944: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10440: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13876: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10388: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=5644: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=9988: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=6764: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=7180: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15700: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16212: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=11784: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=11008: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16068: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=1440: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15392: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=10300: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=9936: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16320: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15252: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=6504: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=15456: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=2868: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }"]
+[1786937114.935] [pid=13160] inject_via_windows_hook: woke pid=6464 posted=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764] post_errors=[]
+[1786937117.274] [pid=8460] main: bridge launched, exe=D:\Program Files\DzsSpeedy\bridge64.exe args=["D:\\Program Files\\DzsSpeedy\\bridge64.exe"]
+[1786937117.369] [pid=8460] cmd in: GETSPEED
+[1786937117.371] [pid=8460] cmd out: GETSPEED -> OK 1.000000
+[1786937117.379] [pid=8460] cmd in: INJECT 4480
+[1786937117.410] [pid=8460] inject_via_windows_hook: installed pid=4480 candidates=[4820, 15280, 16088, 13152, 12636] hooked=[4820, 12636] install_errors=["thread=15280: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=16088: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }", "thread=13152: Error { code: HRESULT(0x80070057), message: \"参数错误。\" }"]
+[1786937117.410] [pid=8460] inject_via_windows_hook: woke pid=4480 posted=[4820, 12636] post_errors=[]
+[1786937117.461] [pid=8460] inject_via_windows_hook: initialized pid=4480 callback_thread=4820 state=Enabled result=0x00000000
+[1786937117.461] [pid=8460] hook cleanup complete for pid=4480, callback_thread=4820, state=Enabled
+[1786937117.462] [pid=8460] do_inject pid=4480: SetWindowsHookExW + SP_HookProc complete thread=4820 state=Enabled
+[1786937117.462] [pid=8460] cmd out: INJECT 4480 -> OK
+[1786937119.479] [pid=8460] cmd in: STATUS 4480
+[1786937119.480] [pid=8460] cmd out: STATUS 4480 -> OK ENABLED
+[1786937119.481] [pid=8460] cmd in: EJECT 4480
+[1786937119.481] [pid=8460] do_eject pid=4480: acceleration disabled; DLL remains resident until target exit
+[1786937119.481] [pid=8460] cmd out: EJECT 4480 -> OK
+[1786937119.482] [pid=8460] bridge shutdown complete
+[1786937122.979] [pid=13160] cmd out: INJECT 6464 -> ERROR INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0
+[1786937124.997] [pid=13160] cmd in: STATUS 6464
+[1786937124.997] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937127.019] [pid=13160] cmd in: STATUS 6464
+[1786937127.019] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937129.028] [pid=13160] cmd in: STATUS 6464
+[1786937129.029] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937131.033] [pid=13160] cmd in: STATUS 6464
+[1786937131.033] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937133.042] [pid=13160] cmd in: STATUS 6464
+[1786937133.043] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937135.058] [pid=13160] cmd in: STATUS 6464
+[1786937135.059] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937137.064] [pid=13160] cmd in: STATUS 6464
+[1786937137.065] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937139.069] [pid=13160] cmd in: STATUS 6464
+[1786937139.070] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937141.084] [pid=13160] cmd in: STATUS 6464
+[1786937141.085] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937143.090] [pid=13160] cmd in: STATUS 6464
+[1786937143.091] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937145.097] [pid=13160] cmd in: STATUS 6464
+[1786937145.097] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937147.102] [pid=13160] cmd in: STATUS 6464
+[1786937147.103] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937149.108] [pid=13160] cmd in: STATUS 6464
+[1786937149.109] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937151.110] [pid=13160] cmd in: STATUS 6464
+[1786937151.111] [pid=13160] cmd out: STATUS 6464 -> OK INITIALIZING
+[1786937153.011] [pid=13160] pending hook monitor: deadline cleanup released hooks for pid=6464
+[1786937153.012] [pid=13160] pending hook monitor: deadline reached for pid=6464; publishing failure
+[1786937153.012] [pid=13160] pending hook monitor: injection did not complete within 30s for pid=6464: SP_HookProc never published a handshake and speedpatch32.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0
+[1786937153.120] [pid=13160] cmd in: STATUS 6464
+[1786937153.120] [pid=13160] cmd out: STATUS 6464 -> OK FAILED injection did not complete within 30s for pid=6464: SP_HookProc never published a handshake and speedpatch32.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0
+[1786937153.127] [pid=13160] cmd in: EJECT 6464
+[1786937153.127] [pid=13160] cmd out: EJECT 6464 -> ERROR injection did not complete within 30s for pid=6464: SP_HookProc never published a handshake and speedpatch32.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=6464, hooked_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], posted_threads=[11616, 14664, 13616, 13000, 13552, 15660, 11796, 15720, 3548, 7596, 2576, 916, 10764], but speedpatch32.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-6464.log; callback_thread=0
+[1786937153.130] [pid=13160] shutdown: could not disable speedpatch for pid=6464: OpenFileMapping(DzsSpeedy.6464): Error { code: HRESULT(0x80070002), message: "系统找不到指定的文件。" }
+[1786937153.130] [pid=13160] shutdown: could not disable speedpatch for pid=6464: OpenFileMapping(DzsSpeedy.6464): Error { code: HRESULT(0x80070002), message: "系统找不到指定的文件。" }
+[1786937153.131] [pid=13160] bridge shutdown complete
+=== repro end 2026-08-17T11:25:56.2190310+08:00 ===

@@ -1,0 +1,20 @@
+== Info:   Trying 127.0.0.1:7897...
+== Info: Connected to 127.0.0.1 (127.0.0.1) port 7897
+== Info: CONNECT tunnel: HTTP/1.1 negotiated
+== Info: allocate connect buffer
+== Info: Establish HTTP proxy tunnel to github.com:443
+=> Send header, 111 bytes (0x6f)
+0000: CONNECT github.com:443 HTTP/1.1
+0021: Host: github.com:443
+0037: User-Agent: curl/8.9.1
+004f: Proxy-Connection: Keep-Alive
+006d: 
+<= Recv header, 37 bytes (0x25)
+0000: HTTP/1.1 200 Connection established
+<= Recv header, 2 bytes (0x2)
+0000: 
+== Info: CONNECT phase completed
+== Info: CONNECT tunnel established, response 200
+== Info: schannel: disabled automatic use of client certificate
+== Info: schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS (0x8009030E) - 安全包中没有可用的凭证
+== Info: closing connection #0

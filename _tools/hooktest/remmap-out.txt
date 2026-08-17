@@ -1,0 +1,5 @@
+imagebase=0x10000000 size=0x00041000 ep=0x000012a0 ns=7
+imp rva=0x00036ce0 sz=0x0000008c; reloc rva=0x00000000 sz=0x00000000
+allocated at 05D60000
+no relocs needed (delta=0xf5d60000)
+import not resolved: api-ms-win-crt-runtime-l1-1-0.dll!ord/name

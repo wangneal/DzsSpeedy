@@ -1,0 +1,7 @@
+LoadLibraryW=758E1960
+alloc=03790000 wrote=86
+remote thread=00000104 waiting
+wait=0 exitcode=0xffffffff
+dll_in_target[0]=0
+dll_in_target[1]=0
+DONE

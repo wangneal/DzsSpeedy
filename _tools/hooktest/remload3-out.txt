@@ -1,0 +1,6 @@
+addrs: gpid=758E3100 gmh=758E10F0 llw=758E1960 lla=758E0E70
+[GetCurrentProcessId] exit=0x00001940 (6464)
+[GetModuleHandleW(winhttp)] exit=0x74470000 (1950810112)
+[LoadLibraryW(winhttp)] exit=0xffffffff (-1)
+[LoadLibraryA(hookdll D:)] exit=0xffffffff (-1)
+DONE

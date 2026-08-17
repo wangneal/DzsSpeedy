@@ -1,0 +1,928 @@
+﻿!This program cannot be run in DOS mode.
+Rich)s3
+.text
+`.rdata
+@.data
+.rsrc
+@.reloc
+L$ _^]
+u7WPS
+u&WVS
+L$$PQ
+D$ R+
+L$,Pj
+L$4QR
+L$4_^
+~tWWW
+T$@RP
+L$$PQ
+|$DRj
+D$ Ph
+T$$QR
+QSUVW
+V PPR
+N|RPQ
+N|RPQ
+RPSSQ
+V|PRQ
+F SSP
+N|RPQ
+L$(WQR
+Fx^][
+_^][d
+u-9\$
+L$4SS
+T$XQj
+L$@PQ
+L$ _^]d
+L$$_^]d
+T$$RV
+D$$WV
+L$ WQ
+L$ tE
+V(_^[Y
+t$(Wj
+SPQVR
+t![_^
+D$HPS
+T$tPQ
+T$tPRP
+D$XPS
+D$4UPS
+L$TPQWS
+D$4PV
+_^][d
+_^][d
+T$$QWVR
+L$$PWVQ
+D$,VP
+_^][d
+_^][d
+HSUVW
+L$$QR
+L$,RUPQUU
+D$8URQ
+T$LPR
+D$Hh 
+D$4SUP
+D$8URQ
+L$ RP
+D$,SRP
+T$,UQR
+T$(SWQR
+L$X_^]d
+L$PQR
+L$XRWPQWW
+D$DPQ
+T$<RP
+T$$RP
+L$,VP
+T$LWR
+T$4VP
+D$,RQ
+T$$WVP
+L$,VWj
+D$4VQ
+T$TQWR
+D$lQPRS
+L$,VW
+T$,V+
+L$HQP
+T$0WVP
+T$8~W
+L$pWR
+L$LWQ
+T$4~W
+VQRPS
+VRPQS
+L$<QRVP
+WVQRPS
+WVRPQS
+WVPQRS
+L$@QPRS
+t$4_][V
+D$(;\$$
+D$0PV
+D$$C;
+D$(NH
+8SUVW
+L$8SRPQ
+|$\t&
+L$$RP
+D$LPj
+D$Pt9
+L$LQj
+\$XRSS
+T$\QR
+D$hPj
+D$hPj
+T$\QR
+D$hPj
+T$hRj
+t$|VQ
+L$@QR
+T$@PWR
+SUVWj
+d$XVPW
+L$TRPQ
+T$TPQR
+L$TRPQ
+L$DVR
+D$TQRP
+L$ _^]d
+_^][d
+D$(j"P
+T$(j!R
+T$(j#R
+T$(j$R
+L$(j%Q
+D$|RP
+L$XPQ
+D$HRP
+T$dQPR
+D$LRh$
+L$<PQ
+T$pPR
+L$`PQ
+D$<Rh
+L$xPQ
+D$HRh
+L$DPQ
+D$XRh
+L$TPQ
+D$ QRP
+_^][d
+SUVWP
+L$0h`
+L$$PR
+D$(VP
+L$(VQ
+L$(VQ
+T$(VR
+_^][d
+\$(UVW
+T$8PR
+L$0PQ
+L$0PQ
+L$<u;
+L$0PQ
+|8Gj/
+T$0PR
+T$0QPR
+T$0QR
+L$ _^][d
+D$DUVWP
+L$0PQ
+D$0WP
+T$4WR
+VUWPQR
+t"j!PV
+0SUVWj
+T$HURW
+0SUVWj
+t$DPQV
+D$HRPV
+T$@VWj
+un=3'
+L$ _^]
+l$ VW
+l$ VW
+l$ VW
+u<_^]
+0123456789abcdef
+MFC42.DLL
+__CxxFrameHandler
+_access
+_EH_prolog
+??2@YAPAXI@Z
+__dllonexit
+_onexit
+MSVCRT.dll
+_initterm
+malloc
+_adjust_fdiv
+??1type_info@@UAE@XZ
+LocalFree
+LocalAlloc
+KERNEL32.dll
+RegisterWindowMessageA
+SetTimer
+PostMessageA
+KillTimer
+EnableWindow
+USER32.dll
+WSASocketA
+WSAWaitForMultipleEvents
+WSAEventSelect
+WSARecv
+WSAEnumNetworkEvents
+WSASend
+WSAConnect
+WS2_32.dll
+_beginthreadex
+_mbscmp
+_ftol
+wcslen
+_stricmp
+CreateEventA
+CloseHandle
+GlobalFree
+MulDiv
+GlobalUnlock
+GlobalLock
+ResumeThread
+GlobalAlloc
+SizeofResource
+LoadResource
+FindResourceA
+WaitForSingleObject
+ResetEvent
+SetEvent
+GetProcAddress
+GetModuleHandleA
+GetModuleFileNameA
+DeleteFileA
+Sleep
+lstrlenA
+GetLastError
+GetExitCodeThread
+CreateThread
+GetVersionExA
+HeapFree
+HeapAlloc
+GetProcessHeap
+PtInRect
+EqualRect
+GetClientRect
+SetRect
+ReleaseDC
+GetDC
+InvalidateRect
+FillRect
+GetSysColor
+SetWindowLongA
+GetWindowLongA
+CallWindowProcA
+DefWindowProcA
+GetWindow
+GetWindowRect
+SendMessageA
+IsWindowVisible
+IsWindow
+LoadBitmapA
+InflateRect
+SetWindowRgn
+BitBlt
+CreateCompatibleBitmap
+CreateCompatibleDC
+GetDeviceCaps
+DeleteObject
+DeleteDC
+SelectObject
+CreateSolidBrush
+CreateDIBSection
+StretchBlt
+RoundRect
+CreatePen
+SelectClipRgn
+CombineRgn
+CreateRectRgn
+GDI32.dll
+ADVAPI32.dll
+SHELL32.dll
+CreateStreamOnHGlobal
+ole32.dll
+OLEPRO32.DLL
+OLEAUT32.dll
+GdipGetImageWidth
+GdipGetImageHeight
+GdipDisposeImage
+GdipAlloc
+GdipCloneBitmapAreaI
+GdipCloneImage
+GdipFree
+GdipImageRotateFlip
+GdipDeleteGraphics
+GdipSetSmoothingMode
+GdipCreateFromHDC
+GdipDrawImageI
+GdipCreateBitmapFromHBITMAP
+GdipCreateBitmapFromStream
+GdipCreateBitmapFromFile
+GdipDrawImagePointRectI
+GdipCreateHBITMAPFromBitmap
+GdipDrawImageRectRectI
+GdipSetInterpolationMode
+GdipBitmapGetPixel
+GdipDeleteFont
+GdipDeleteStringFormat
+GdipMeasureString
+GdipDeleteBrush
+GdipCreateSolidFill
+GdipCreateStringFormat
+GdipDeleteFontFamily
+GdipCreateFont
+GdipCreateFontFamilyFromName
+GdipSetTextRenderingHint
+GdipSetStringFormatAlign
+GdipSetStringFormatLineAlign
+GdipDrawString
+GdipSetStringFormatTrimming
+GdipCloneBrush
+GdipGetGenericFontFamilySansSerif
+gdiplus.dll
+??1_Lockit@std@@QAE@XZ
+??0_Lockit@std@@QAE@XZ
+MSVCP60.dll
+dbghelp.dll
+Loading.dll
+CloseLoadingDlg
+DomodalLoadingDlg
+*_RegisterWindowMessageSkinFlashButton_*
+*_RegisterWindowMessageSendToParentWndFromSkinFlashButton_*
+Loading.dat
+http://soft.jdbbx.com/oempage/ad/topright/images/loading.bmp
+.?AVCNoTrackObject@@
+.?AVAFX_MODULE_STATE@@
+.?AV_AFX_DLL_MODULE_STATE@@
+.?AVtype_info@@
+.PAVCFileException@@
+UpdateLayeredWindow
+user32.dll
+Bitmap
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+HttpDownload/2.0
+.down
+http://
+User-Agent: 
+Range: bytes=%d-
+Pragma: no-cache
+Host: 
+Connection: Keep-Alive
+Cache-Control: no-cache
+Accept: */*
+Authorization: Basic 
+Proxy-Authorization: Basic 
+ HTTP/1.1
+HEAD 
+last-modified:
+content-length:
+location:
+jan,feb,mar,apr,may,jan,jul,aug,sep,oct,nov,dec
+HrCg@b
+tEXtSoftware
+Adobe ImageReadyq
+iTXtXML:com.adobe.xmp
+<?xpacket begin="
+" id="W5M0MpCehiHzreSzNTczkc9d"?> <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.0-c060 61.134777, 2010/02/12-17:32:00        "> <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/" xmlns:stRef="http://ns.adobe.com/xap/1.0/sType/ResourceRef#" xmp:CreatorTool="Adobe Photoshop CS5 Windows" xmp:CreateDate="2013-03-21T15:39:10+08:00" xmp:ModifyDate="2013-03-21T15:39:39+08:00" xmp:MetadataDate="2013-03-21T15:39:39+08:00" dc:format="image/png" xmpMM:InstanceID="xmp.iid:7CCFBE5591FA11E29B95E52B9880E4C4" xmpMM:DocumentID="xmp.did:7CCFBE5691FA11E29B95E52B9880E4C4"> <xmpMM:DerivedFrom stRef:instanceID="xmp.iid:7CCFBE5391FA11E29B95E52B9880E4C4" stRef:documentID="xmp.did:7CCFBE5491FA11E29B95E52B9880E4C4"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end="r"?>
+IDATx
+C&n6H
+1P[-T
+~BP?&
+td%'1
+Zh_{~
+9Uqt"
+orf&K
+PnEr8
+XFnP,P
+\q5}LkQ
+?\|Fz
+hD{JyE
+qw@vh
+N1LDH
+Nknal
+~2J@S
+f1ye-Q!9
+Tsg`I
+0YLhp5
+Lj$%:6
+"MXOMtx
+7)VT%
+yuNsLcX
+gEWjT
+*SR<{
+`4;`'
+hQ/cR
+`&#Z^
+6=8x~mv
+S#lRA
+UlOUJ
+<:xxA
+tm\N8
+`TV9X]
+[~F%$ S
+"S.cy
+[S1uI
+"mJ\*
+>"#O#
+JTh.#w
+pKA%U
+<&U;&[a
+2!z:R
+oF*;Yk
+^}tSS
+*'g1F
+8Cza|#fw
+X^r5{
+(~{Jib
+w5=`gF
+1dc<d7
+ma7<=
+GGPr{
+7Pe^w
+$Uy4b#
+23\r8&Y
+F|cZxv
+! i4"
+/*+v#
+y=!F<
+3SGyG
+Z12X#h
+ZH lA
+b2@if
+ c0HD
+x_|:@
+4`K|'
+fX|ss
+QLdc?
+[tnb1>
+=}kv,
+(;qyRn
+(G/2r}2
+NyaWL#$
+zj<h!O
+q_Q8O
+4$=5P
+w\24V
+DuX'I
+ 5{R(.^
+^1I1]
+K{W2|&
+#1#kuT]
+sr#Pe
+"6xw/
+ {d`h
+iP'^;J
+D.rwF1
+wrf^IA
+,eC)!u
+uI~D\
+ {7Xoz
+lLp;^Xf
+dy4mM
+^oB0Mh
+``cPW
+@ =?l
+Z[vz^
+o+N%(
+o2Q":
+7?xp2}
+ErFQR-
+<|W<=@
+&hfb@
+`*~W5P
+uTru9/
+:^C\0
+zqrn}
+vvX%<
+^VL<o
+/vI@3;
+f{P>u}
+SYR"3
+fdMYt?
+p4<o#
+obiI|ee
+MyRNQ
+uZUko
+=Q(}g
+A."tF
+uOv@U
+]g"PyA
+vS,vuR
+UZ^"g
+@|fog=
+^_@<t
+l11{j"w
+hG5-d
+0IJGe
+?9@e@B
+,g+W'W
+\aBqn
+s9;T7
+Pu8jN&
+T9UfV
+}$\^U
+f\i.*7]/
+oMiu`
+[*TC|
+goWjO
+V4lPdB
+i,O&9C
+puytL
+.|2Jf
+{/YaG
+%2s>*ye
+K1!;~
+\j$Q)
+yXT`m
+(,?CNha
+8Hkzx%
+8"b>w
+hBuG:
+5~*iU
+S/{n{I
+o-4f^N0
+3f<ps
+tj=0K
+.OV.]^=6
+Rlp2,
+zce46
+u?&hJ
+OgCZ_
+75n!st(yS^
+Vi|7Je/
+ymo9@AB;n
+UeKW7Bd{
+Sdg)E
+Z2|qc:
+l8]|r
+2<2+|
+az0Q#
+v"thdY}[
+(p1@?
+_$UWUH
+6akh&=l
+2`o~$
+UxVlq
+kL}#|
+]k|g)
+Ayt@O
+Q$g#S
+&H/Yc#,/
+@2F6#e
+K$1 .
+Klu &
+}[*Jl
+=z>:V
+"5[gI<K]
+s{/|V
+{EdK9
+`ymH{
+n)fIh
+(;1+6oN
+byr^}
+@q,jk0
+)*\2u-
+?SoR,
+z}6Bkt
+0a,P6au
+j|g  
+-c"wt
+?I?vt
+[[S?c
+&h^@82
+7`}W#
+Lw$Jb
+|zHW:
+r8QX=
+J4}]Rn
+Em[ty
+kA@,`
+J4;]d
+"XpNx
+Y*%pm
+5QSifF
+(MMrr
+}jMR^s
+<-cp_G
+ ]q3:XW
+%920X
+tuZ)QM%
+(>@1'
+J&fo~
+SFNt?
+^VO\DE
+)n`QS
+xR'6%
+G&xy\]
+Bs*];<
+f,*;#
+s2&uC8
+Mfm w+
+SBx3U
+XV}v"
+>62l?
+tN/wGIz
+X.qYUzV
+ce}.Uq
+7a5F<
+q3@oE
+5Ew,2
+w]/`}
+PAPxoOC]
+&gvcf
+>Pww)
+&IhT}\
+^pb$Cl~p
+KY+82
+fISaB
+e6b r
+31!1 +K(u1w
+dV7i6m"T
+=5g(I
+`,[t={;
+O xi,
+T(zAkN
++\g\/
+<BgE;
+_@u'/
+"r70Q
+zbl^S*
+{C?Qu
+KCDaJ
+FV|I6
+J:u8i
+>efPCI
+;%i#{
+KeB}&%?v%
+/F)Et
+R [7I
+of3YY
+@mNmA<Yi
+ana;,
+1*f\2
+0>-2([
+rPO!WL
+!Sim 
+=LJ!&c
+Jbn)S
+3si*>
+&M{b)z
+s1*u,
+nkRdSB\1
+xnk&g 
+USaHS{!e
+=6lnC"nW
+a~Mi}
+hH]3/
+XJQ(s
+jh:swfFYL
+jPOgS
+2Wq-3
+D8<j'
+54l:8&
+vD4Tz
+\r!O*=
+bLe:n
+3{/\:
+_/;ip
+{aD&Z
+&<eqX-
+/_x"o
+;kv?~
+cx|x<}
+WMDTMf
+khJX3-
+Cl<0v
+]DW\B3n
+_}p'"
+vNA,(
+3lu1 7
+Eqg2S
+i]VEs
+`qDJ,
+-3@o88
+s@V%h<p
+D>P_M
+W-2q:
+h!)*}
+(DsDg
+=gio5
+52>TO
+z#._q
+Y}i,`
+2P"rz
+HCo:8
+_n2UB
+d,_iF
+2No^g/
+PTx?0
+DVJ-KrB
+y!c&%
+GIF89a
+NETSCAPE2.0
+XMP DataXMP<?xpacket begin="
+" id="W5M0MpCehiHzreSzNTczkc9d"?> <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.0-c060 61.134777, 2010/02/12-17:32:00        "> <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"> <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/" xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/" xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#" xmlns:stRef="http://ns.adobe.com/xap/1.0/sType/ResourceRef#" xmp:CreatorTool="Adobe Photoshop CS5 Windows" xmp:CreateDate="2012-05-31T10:03:53+08:00" xmp:ModifyDate="2012-06-05T09:49:26+08:00" xmp:MetadataDate="2012-06-05T09:49:26+08:00" dc:format="image/gif" xmpMM:InstanceID="xmp.iid:AEE4983FAEB011E1BD98FE21DB3F258A" xmpMM:DocumentID="xmp.did:AEE49840AEB011E1BD98FE21DB3F258A" xmpMM:OriginalDocumentID="xmp.did:1EAEEAD3E1AAE11187CEADBC6B45CC54"> <photoshop:DocumentAncestors> <rdf:Bag> <rdf:li>xmp.did:80F547694121DF11B2B4D9A4DD3116DC</rdf:li> <rdf:li>xmp.did:96D11255DCC7E011B47DF92FD445B5B3</rdf:li> <rdf:li>xmp.did:99D11255DCC7E011B47DF92FD445B5B3</rdf:li> </rdf:Bag> </photoshop:DocumentAncestors> <xmpMM:History> <rdf:Seq> <rdf:li stEvt:action="created" stEvt:instanceID="xmp.iid:1EAEEAD3E1AAE11187CEADBC6B45CC54" stEvt:when="2012-05-31T10:03:53+08:00" stEvt:softwareAgent="Adobe Photoshop CS5 Windows"/> </rdf:Seq> </xmpMM:History> <xmpMM:DerivedFrom stRef:instanceID="xmp.iid:1EAEEAD3E1AAE11187CEADBC6B45CC54" stRef:documentID="xmp.did:1EAEEAD3E1AAE11187CEADBC6B45CC54"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end="r"?>
+~}|{zyxwvutsrqponmlkjihgfedcba`_^]\[ZYXWVUTSRQPONMLKJIHGFEDCBA@?>=<;:9876543210/.-,+*)('&%$#"! 
+=3EE#
+7.>9y
+0A0G0L0a0q0
+1!111A1
+3(3/3s3
+4+454K4q4
+4R5l5
+5!6@6
+7 7&7,72787>7D7J7P7V7\7b7h7n7t7z7
+8"8(8.848:8@8F8L8R8X8^8d8j8p8v8|8
+9.9W9c9m9y9
+;1;>;E;J;p;
+<@<R<
+<!='=,=Q=W=\=s=
+=2>s>
+>!?1?C?
+2/2I2n263P3j3
+334O4f4
+4(5H5
+566A6
+7!7Q7n7
+8H8N8d8
+8=9_9l9
+:#:,:b<
+= =N=
+?.?;?i?
+465e5
+6/767i7}7
+8J8`8m8
+8/:<;v;
+<)<w=
+0#1I2{2
+33H5q5w5|5
+6W6\6c6k6z6
+7'7Q7n7~7
+8&8a8
+9(969
+9O:}:
+;K;Z;n;
+;J<P<f<
+=&=,=Z=
+363E3W3
+5!5*5P5k5
+8J8{8
+9C9Y9
+;?;x;
+<C<n<
+7]7h7
+7,8}8
+1-1<1
+4C4#5
+546K6~6
+8.9b9
+;#=F=_=
+50Q0Z0`0d0o0w0
+3$313C3k3
+6:7o7
+<3<E<
+=<=@=D=H=c=
+3;4L4
+5-5F5Q5
+6"6n6
+;W;g;w;
+1#2B2
+7<8J8
+9>9I9x9
+9\:e:l:
+;F;_;
+;'<-<
+=K=`=
+=_>m>
+>"?d?
+0)050N0m0
+1"1M1
+6o7v7
+7,838
+:%:B:V:
+:$=@=D=H=L=P=
+0 02080>0D0J0P0V0\0b0h0n0t0z0
+1"1(1.141:1@1F1L1R1X1^1d1j1p1v1|1
+2R2X2^2d2j2p2v2|2
+3$3A3Y3y3
+4g4y4
+515u5
+8%8*8E8J8e8j8
+8$9A9
+585<5@5D5H5L5P5T5X5\5`5d5h5l5p5t5x5|5
+6 6$6(6,6064686<6@6D6H6L6P6T6X6\6`6d6h6l6p6t6x6|6
+7 7$7(7,7D7\7x7|7
+8 8$8(8,8084888<8@8D8H8L8P8T8X8\8`8d8h8l8p8t8x8|8
+9 9$9(9,9094989<9@9D9H9L9P9T9X9\9`9d9h9l9p9t9x9|9
+; ;8;L;\;`;p;
+< <<<D<L<X<t<
+=,=4=<=H=d=p=
+>$>0>L>T>\>d>l>x>
+?$?0?L?X?t?|?
+0(0D0L0X0t0|0
+141<1H1d1p1
+2,282T2\2d2l2x2
+3$3,343<3D3P3l3x3
+4$4,444<4H4d4l4t4|4
+5$5<5
+6$606L6T6\6d6l6t6|6
+7$7,747<7D7L7X7t7|7
+8$8,848<8D8L8T8\8d8l8t8|8
+0 0$0(0,00040
+101P1
+Z0X03
+Western Cape1
+Durbanville1
+Thawte1
+Thawte Certification1
+Thawte Timestamping CA0
+121221000000Z
+201230235959Z0^1
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G20
+]jxdE
+&0$0"
+http://ocsp.thawte.com0
+80604
+.http://crl.thawte.com/ThawteTimestampingCA.crl0
+TimeStamp-2048-10
+VeriSign, Inc.1705
+.Class 3 Public Primary Certification Authority0
+061108000000Z
+211107235959Z0
+VeriSign, Inc.1
+VeriSign Trust Network1:08
+1(c) 2006 VeriSign, Inc. - For authorized use only1E0C
+<VeriSign Class 3 Public Primary Certification Authority - G50
+CcjRK
+*0(0&
+ http://crl.verisign.com/pca3.crl0
+60402
+https://www.verisign.com/cps0
+3130m
+[0Y0W0U
+image/gif0!0
+#http://logo.verisign.com/vslogo.gif04
+(0&0$
+http://ocsp.verisign.com0
+YjAF~
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G20
+121018000000Z
+201229235959Z0b1
+Symantec Corporation1402
++Symantec Time Stamping Services Signer - G40
+g0e0*
+http://ts-ocsp.ws.symantec.com07
++http://ts-aia.ws.symantec.com/tss-ca-g2.cer0<
+50301
++http://ts-crl.ws.symantec.com/tss-ca-g2.crl0(
+TimeStamp-2048-20
+\vnO^
+y3+.{
+>"hcS
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA0
+130107000000Z
+150107235959Z0
+FuJian1
+FuZhou1-0+
+5Digital ID Class 3 - Microsoft Software Validation v21
+;AMcn
+d:1v.I
+90705
+/http://csc3-2010-crl.verisign.com/CSC3-2010.crl0D
+=0;09
+https://www.verisign.com/rpa0
+e0c0$
+http://ocsp.verisign.com0;
+/http://csc3-2010-aia.verisign.com/CSC3-2010.cer0
+q4r||5
+ifi"M
+VeriSign, Inc.1
+VeriSign Trust Network1:08
+1(c) 2006 VeriSign, Inc. - For authorized use only1E0C
+<VeriSign Class 3 Public Primary Certification Authority - G50
+100208000000Z
+200207235959Z0
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA0
+z;T0S
+i0g0e
+https://www.verisign.com/cps0*
+https://www.verisign.com/rpa0
+[0Y0W0U
+image/gif0!0
+#http://logo.verisign.com/vslogo.gif04
+-0+0)
+#http://crl.verisign.com/pca3-g5.crl04
+(0&0$
+http://ocsp.verisign.com0
+VeriSignMPKI-2-80
+G8J-l
+VeriSign, Inc.1
+VeriSign Trust Network1;09
+2Terms of use at https://www.verisign.com/rpa (c)101.0,
+%VeriSign Class 3 Code Signing 2010 CA
+www.fzcyjh.com0
+$p~iH
+0r0^1
+Symantec Corporation100.
+'Symantec Time Stamping Services CA - G2
+130427025537Z0#
+;m3ad

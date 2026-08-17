@@ -1078,6 +1078,15 @@ fn completed_without_terminal_handshake_detail(
     )
 }
 
+/// How long the bridge waits before checking whether the hook DLL actually
+/// entered the target. When the target accepts a WH_GETMESSAGE hook but never
+/// dispatches it (windowless game loop, or protection blocking the hook-DLL
+/// injection), the DLL never loads and SP_HookProc can never run. Failing fast
+/// here turns a silent 15s+ wait into an actionable error, and keeps the
+/// pending-injection monitor from being spawned for a target that can never
+/// complete the chain.
+const DLL_INJECTION_PROBE_GRACE: std::time::Duration = std::time::Duration::from_secs(8);
+
 fn wait_for_hook_callback(
     pid: u32,
     process: &TargetProcessHandle,
@@ -1085,10 +1094,13 @@ fn wait_for_hook_callback(
     hooked_threads: &[u32],
     posted_threads: &[u32],
     initial_log_len: u64,
+    dll_path: &str,
 ) -> Result<HookWaitOutcome, String> {
     let mut observed_handshake = false;
     let mut callback_thread = 0;
     let mut terminal_result = None;
+    let dll_probe_deadline = std::time::Instant::now() + DLL_INJECTION_PROBE_GRACE;
+    let mut dll_probe_done = false;
 
     for _ in 0..300 {
         if process.has_exited()? {
@@ -1187,6 +1199,44 @@ fn wait_for_hook_callback(
             return Err(format!(
                 "bridge shutdown interrupted SetWindowsHookExW injection before callback entry for pid={pid}, hooked_threads={hooked_threads:?}"
             ));
+        }
+
+        // Fast-fail probe: if the hook DLL never appears in the target within
+        // DLL_INJECTION_PROBE_GRACE, SP_HookProc can never run there — the
+        // hook was accepted but the injection was rejected or is never
+        // dispatched. Report that instead of waiting out the full callback
+        // window and then leaving the pending monitor spinning forever.
+        if !dll_probe_done
+            && !observed_handshake
+            && !completion_signaled
+            && std::time::Instant::now() >= dll_probe_deadline
+        {
+            dll_probe_done = true;
+            let dll_name = speedpatch_dll(BRIDGE_IS64);
+            match find_remote_module(pid, dll_name, Some(dll_path)) {
+                Ok(Some(module)) => {
+                    dbg_log(&format!(
+                        "inject_via_windows_hook: {dll_name} present in pid={pid} at 0x{:x} after {}s; handshake still pending",
+                        module.base, DLL_INJECTION_PROBE_GRACE.as_secs()
+                    ));
+                }
+                Ok(None) => {
+                    if !process.has_exited()? {
+                        return Err(format!(
+                            "SetWindowsHookExW installed for pid={pid}, hooked_threads={hooked_threads:?}, posted_threads={posted_threads:?}, but {dll_name} was not loaded into the target within {}s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: {}",
+                            DLL_INJECTION_PROBE_GRACE.as_secs(),
+                            std::env::temp_dir()
+                                .join(format!("dzsspeedy-speedpatch-{pid}.log"))
+                                .display()
+                        ));
+                    }
+                }
+                Err(error) => {
+                    dbg_log(&format!(
+                        "inject_via_windows_hook: module probe failed for pid={pid}: {error}"
+                    ));
+                }
+            }
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
@@ -1314,6 +1364,7 @@ fn inject_via_windows_hook(pid: u32, dll_path: &str) -> Result<HookInjectionOutc
             &hooked_threads,
             &posted_threads,
             initial_log_len,
+            dll_path,
         )
     };
 
@@ -1519,6 +1570,14 @@ struct PendingInjectionMonitor {
 /// callback never delivered).
 const SHUTDOWN_PENDING_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
 
+/// Upper bound on a pending-injection monitor that sees no progress at all:
+/// hooks installed but SP_HookProc never runs and the handshake never
+/// appears. Without this bound the monitor loops forever (and after its
+/// spawn, STATUS reports INITIALIZING indefinitely — the eternal UI spinner),
+/// because neither the target-exit nor the handshake/completion termination
+/// conditions can ever become true.
+const PENDING_INJECTION_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+
 fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
     std::thread::spawn(move || {
         let PendingInjectionMonitor {
@@ -1537,6 +1596,7 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
         let mut last_cleanup_error = None;
         let mut shutdown_grace_started: Option<std::time::Instant> = None;
         let mut last_shutdown_disable_log: Option<std::time::Instant> = None;
+        let monitor_deadline = std::time::Instant::now() + PENDING_INJECTION_DEADLINE;
         loop {
             match process.has_exited() {
                 Ok(true) => {
@@ -1674,6 +1734,36 @@ fn monitor_pending_injection(monitor: PendingInjectionMonitor) {
                         ));
                     }
                 }
+            }
+
+            // Deadline: no terminal state after PENDING_INJECTION_DEADLINE.
+            // Reaching this point means neither the handshake nor the
+            // completion event can ever become visible (SP_HookProc never
+            // ran), so waiting longer only keeps STATUS in INITIALIZING and
+            // the UI spinner spinning. Release the hooks, record an explicit
+            // failure, and let the publish block below terminate the monitor.
+            if !shutdown_requested() && std::time::Instant::now() >= monitor_deadline {
+                if terminal.is_none() {
+                    let dll_name = speedpatch_dll(BRIDGE_IS64);
+                    terminal = Some(Err(format!(
+                        "injection did not complete within {}s for pid={pid}: SP_HookProc never published a handshake and {dll_name} was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: {pending_detail}",
+                        PENDING_INJECTION_DEADLINE.as_secs()
+                    )));
+                    terminal_without_completion = true;
+                }
+                if let Some(mut owned_hooks) = hooks.take() {
+                    match owned_hooks.cleanup() {
+                        Ok(()) => dbg_log(&format!(
+                            "pending hook monitor: deadline cleanup released hooks for pid={pid}"
+                        )),
+                        Err(error) => dbg_log(&format!(
+                            "pending hook monitor: deadline hook cleanup still pending for pid={pid}: {error}"
+                        )),
+                    }
+                }
+                dbg_log(&format!(
+                    "pending hook monitor: deadline reached for pid={pid}; publishing failure"
+                ));
             }
 
             if hooks.is_none() && (callback_finished || terminal_without_completion) {

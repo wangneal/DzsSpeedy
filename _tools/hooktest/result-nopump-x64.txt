@@ -1,0 +1,26 @@
+﻿=== nopump start 2026-08-17T10:27:44.3345933+08:00 arch=x64 bridge=D:\DzsSpeedy\_tools\hooktest\bridge64.exe ===
+fixture_pid=5140
+spawned_bridge pid=11820
+[10:27:47] GETSPEED -> OK 1.000000
+[10:27:55] INJECT 5140 -> ERROR INJECTION_PENDING: SetWindowsHookExW installed for pid=5140, hooked_threads=[11672, 11880, 15808, 7164, 12916], posted_threads=[11672, 11880, 15808, 7164, 12916], but speedpatch64.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-5140.log; callback_thread=0
+inject_elapsed_ms=8069
+[10:27:57] STATUS 5140 -> OK INITIALIZING
+[10:27:59] STATUS 5140 -> OK INITIALIZING
+[10:28:01] STATUS 5140 -> OK INITIALIZING
+[10:28:03] STATUS 5140 -> OK INITIALIZING
+[10:28:05] STATUS 5140 -> OK INITIALIZING
+[10:28:07] STATUS 5140 -> OK INITIALIZING
+[10:28:09] STATUS 5140 -> OK INITIALIZING
+[10:28:11] STATUS 5140 -> OK INITIALIZING
+[10:28:13] STATUS 5140 -> OK INITIALIZING
+[10:28:15] STATUS 5140 -> OK INITIALIZING
+[10:28:17] STATUS 5140 -> OK INITIALIZING
+[10:28:19] STATUS 5140 -> OK INITIALIZING
+[10:28:21] STATUS 5140 -> OK INITIALIZING
+[10:28:23] STATUS 5140 -> OK INITIALIZING
+[10:28:25] STATUS 5140 -> OK FAILED injection did not complete within 30s for pid=5140: SP_HookProc never published a handshake and speedpatch64.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=5140, hooked_threads=[11672, 11880, 15808, 7164, 12916], posted_threads=[11672, 11880, 15808, 7164, 12916], but speedpatch64.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-5140.log; callback_thread=0
+status_stayed_initializing_s=28
+[10:28:25] EJECT 5140 -> ERROR injection did not complete within 30s for pid=5140: SP_HookProc never published a handshake and speedpatch64.dll was never observed in the target, so the hook-DLL injection was likely rejected (anti-cheat protection) or no target thread dispatches WH_GETMESSAGE messages. Restart the target before retrying. Last detail: INJECTION_PENDING: SetWindowsHookExW installed for pid=5140, hooked_threads=[11672, 11880, 15808, 7164, 12916], posted_threads=[11672, 11880, 15808, 7164, 12916], but speedpatch64.dll was not loaded into the target within 8s of waking it. The target either rejects the hook-DLL injection (anti-cheat protection) or never dispatches WH_GETMESSAGE callbacks, so SP_HookProc can never run. DLL log: C:\Users\Administrator\AppData\Local\Temp\dzsspeedy-speedpatch-5140.log; callback_thread=0
+[10:28:25] SHUTDOWN -> OK shutting down
+VERDICT=GREEN_FAILED
+=== nopump end 2026-08-17T10:28:27.9218286+08:00 ===

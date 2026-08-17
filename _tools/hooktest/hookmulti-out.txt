@@ -1,0 +1,7 @@
+dll=D:\DzsSpeedy\_tools\hooktest\hookdll32.dll proc=6BCE10B0 tid=11616
+WH_FOREGROUNDIDLE: OK err=0
+WH_GETMESSAGE: OK err=0
+posted WM_NULL
+WH_CBT: OK err=0
+dll_in_target=0 dll_seen=0 proc_seen=0
+DONE

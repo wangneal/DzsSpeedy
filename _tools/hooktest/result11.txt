@@ -1,0 +1,15 @@
+﻿=== start 2026-08-17T01:30:47.4853738+08:00 ===
+killing tcls_core pid=12280
+killing wegame pid=1096
+killing wegame_env pid=10096
+
+SERVICE_NAME: WeGameProcService 
+        TYPE               : 1  KERNEL_DRIVER  
+        STATE              : 1  STOPPED 
+        WIN32_EXIT_CODE    : 0  (0x0)
+        SERVICE_EXIT_CODE  : 0  (0x0)
+        CHECKPOINT         : 0x0
+        WAIT_HINT          : 0x0
+[SC] ChangeServiceConfig 成功
+wegame_driver_state=Stopped
+=== end 2026-08-17T01:30:54.5039901+08:00 ===

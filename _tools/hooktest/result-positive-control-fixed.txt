@@ -1,0 +1,5 @@
+﻿=== positive control 2026-08-17T13:48:04.0704765+08:00 bridge=D:\DzsSpeedy\_tools\hooktest\bridge64.exe arch=x64 ===
+fixture_pid=4584 bridge_pid=14960
+INJECT elapsed_ms=85 -> OK
+STATUS -> OK ENABLED
+=== end 2026-08-17T13:48:11.5622478+08:00 ===

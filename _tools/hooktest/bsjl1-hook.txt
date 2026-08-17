@@ -1,0 +1,323 @@
+﻿!This program cannot be run in DOS mode.
+w7bGw
+wRich
+.text
+`.rdata
+@.data
+.rsrc
+@.reloc
+QQSVWd
+X_^[]
+SVWUj
+t.;t$$t(
+u7WPS
+u&WVS
+eYt,F
+YY_^[
+sO;>|C;~
+QQSVW
+t:jtj
+u?jtj
+QQSVW
+QQSVW
+HSVWh
+?=t"U
+8"uF@
+SS@SSPVSS
+t#SSUP
+t$$VSS
+_^][YY
+t>j,P
+WufS3
+^}%95
+SVWj 
+SVWj 
+VC20XC00U
+uA;5t
+Wj@Y3
+SUVWu
+VWuBh<
+HSVHWtgHHtF
+uFWWj
+"WWShp
+tMWWS
++ttHHtd
+PPPPPPPP
+PPPPPPPP
+FGQPS
+GAIsProcessorFeaturePresent
+KERNEL32
+e+000
+__GLOBAL_HEAP_SELECTED
+__MSVCRT_HEAP_SELECT
+runtime error 
+TLOSS error
+SING error
+DOMAIN error
+R6028
+- unable to initialize heap
+R6027
+- not enough space for lowio initialization
+R6026
+- not enough space for stdio initialization
+R6025
+- pure virtual function call
+R6024
+- not enough space for _onexit/atexit table
+R6019
+- unable to open console device
+R6018
+- unexpected heap error
+R6017
+- unexpected multithread lock error
+R6016
+- not enough space for thread data
+abnormal program termination
+R6009
+- not enough space for environment
+R6008
+- not enough space for arguments
+R6002
+- floating point not loaded
+Microsoft Visual C++ Runtime Library
+Runtime Error!
+Program: 
+<program name unknown>
+GetLastActivePopup
+GetActiveWindow
+MessageBoxA
+1#QNAN
+1#INF
+1#IND
+1#SNAN
+H:mm:ss
+dddd, MMMM dd, yyyy
+M/d/yy
+December
+November
+October
+September
+August
+April
+March
+February
+January
+Saturday
+Friday
+Thursday
+Wednesday
+Tuesday
+Monday
+Sunday
+SunMonTueWedThuFriSat
+JanFebMarAprMayJunJulAugSepOctNovDec
+QueryPerformanceCounter
+ReadProcessMemory
+GetCurrentProcess
+GetProcAddress
+LoadLibraryA
+GetTickCount
+GetCurrentProcessId
+MapViewOfFile
+CreateFileMappingA
+KERNEL32.dll
+GetDesktopWindow
+GetWindowThreadProcessId
+FindWindowA
+USER32.dll
+timeGetTime
+WINMM.dll
+RtlUnwind
+GetCommandLineA
+GetVersion
+GetModuleHandleA
+GetCurrentThreadId
+TlsSetValue
+TlsAlloc
+TlsFree
+SetLastError
+TlsGetValue
+GetLastError
+ExitProcess
+TerminateProcess
+SetHandleCount
+GetStdHandle
+GetFileType
+GetStartupInfoA
+DeleteCriticalSection
+GetModuleFileNameA
+FreeEnvironmentStringsA
+FreeEnvironmentStringsW
+WideCharToMultiByte
+GetEnvironmentStrings
+GetEnvironmentStringsW
+GetEnvironmentVariableA
+GetVersionExA
+HeapDestroy
+HeapCreate
+VirtualFree
+HeapFree
+WriteFile
+InterlockedDecrement
+InterlockedIncrement
+SetUnhandledExceptionFilter
+IsBadReadPtr
+IsBadWritePtr
+IsBadCodePtr
+HeapAlloc
+InitializeCriticalSection
+EnterCriticalSection
+LeaveCriticalSection
+GetCPInfo
+GetACP
+GetOEMCP
+VirtualAlloc
+HeapReAlloc
+MultiByteToWideChar
+GetStringTypeA
+GetStringTypeW
+LCMapStringA
+LCMapStringW
+hook.dll
+SetTimer
+user32.dll
+QueryPerformanceCounter
+GetTickCount
+kernel32.dll
+timeGetTime
+winmm.dll
+Shell_TrayWnd
+Code To High Mem
+z?aUY
+zc%C1
+-64OS
+R0W0r1w1
+4b5z5
+6!6&6N6e6n6
+7+707A7F7d7
+8$80858:8F8K8P8
+=#=+=6=<=B=L=d=i=s=
+=Z>u>
+?7?R?b?
+<%<5<;<C<a<g<x<
+=,=2=>=C=
+>G>S>Z>j>p>w>
+>1?7?Y?m?
+0-0Q0{0
+1"111c1s1
+2a2h2
+3&4.4H4T4d4
+5D5a5
+7(787?7F7L7s7
+8$828=8P8w8
+9"979M9T9
+:;;V;^;d;j;
+4 4$4(4,4044484
+5 5'5,50545Q5{5
+6 6$6(6,6(7>7K7Q7V7]7c7v7
+7*9/9|9
+:*:d:j:r:z:
+;5;P;`;f;r;w;
+;<<B<n<
+>!>S>e>t>
+? ?+?Y?e?o?z?
+1$1E1Q1c1q1
+252[2u2|2
+2Z3e3
+4 4$4(4,404z4
+9`;n;t;
+<.<4<?<D<M<R<b<h<
+<R=??J?R?e?k?
+1-131C1z1
+12282C2I2e2k2u2{2
+2W3q3
+597B7H7T7Y7c7j7r7x7
+9;9@9
+;$;D;
+<&<4<R<o<
+030~0
+1>1f1
+3W4[4_4c4g4k4o4s4w4{4
+455O5`5}5
+7C7^7f7l7r7
+8N8";6;
+d1h1x1
+5$505<5|5
+50787h7|7
+141<1D1L1T1\1d1l1t1|1
+444D4T4P6T6X6\6
+9 9$9(9,9094989<9@9D9H9L9P9T9X9\9`9d9h9l9p9t9x9|9
+9H=L=
+Y0W03
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+070425000000Z
+190709184036Z0L1
+WoSign, Inc.1&0$
+WoSign Code Signing Authority0
+'!7f@
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0
+%[%&z
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+990709183120Z
+190709184036Z0
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0)
+k%%-Q
+CN>k'
+T bli
+If>PF
+cq81b
+WoSign, Inc.1&0$
+WoSign Code Signing Authority0
+100113000000Z
+110113235959Z0
+Fujian1
+Fuzhou110/
+(Fuzhou TianxiaChuangshi Digital Co.,Ltd.1503
+,Class 3 - for Microsoft Authenticode Signing110/
+(Fuzhou TianxiaChuangshi Digital Co.,Ltd.0
+-7`kIl
+=,5gG
+;0907
+http://www.wosign.com/cps/0<
+50301
++http://crl.wosign.com/WoSignCodeSigning.crl0G
+;0907
++http://crt.wosign.com/WoSignCodeSigning.crt0
+7W`J$%
+f[pnn0
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object0
+070430000000Z
+120429235959Z0J1
+WoSign, Inc.1$0"
+WoSign Time Stamping Signer0
+&tyK+{
+edIBJ
+G0E0C
+%http://www.comodogroup.com/repository0B
+;0907
+1http://crl.usertrust.com/UTN-USERFirst-Object.crl0
+0`0L1
+WoSign, Inc.1&0$
+WoSign Code Signing Authority
+=2Dj0
+Salt Lake City1
+The USERTRUST Network1!0
+http://www.usertrust.com1
+UTN-USERFirst-Object
+100115043453Z0#
+;(;GuO*

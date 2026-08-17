@@ -1,0 +1,2 @@
+3bcb4f7:src-bridge/src/main.rs
+3bcb4f7:src-tauri/src/bridge_client.rs
