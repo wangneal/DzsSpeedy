@@ -32,7 +32,8 @@
     "windows": {
       "wix": {
         "language": "zh-CN",
-        "fragmentPaths": ["wix/root-cert.wxs"]
+        "fragmentPaths": ["wix/root-cert.wxs"],
+        "componentGroupRefs": ["DzsRootCert"]
       }
     },
     "resources": {

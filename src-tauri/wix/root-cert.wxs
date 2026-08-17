@@ -20,6 +20,12 @@
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
+    <!-- Empty group referenced via componentGroupRefs (tauri.conf.json):
+         WiX light only links fragment sections that are reachable from the
+         product, so without a referenced symbol the CustomActions and the
+         InstallExecuteSequence rows below would be dropped entirely. -->
+    <ComponentGroup Id="DzsRootCert" />
+
     <!-- add: certutil -addstore Root "[INSTALLFOLDER]dzsspeedy-root.cer" -->
     <CustomAction Id="DzsAddRootCert" Directory="INSTALLFOLDER"
       ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -addstore -f Root &quot;[INSTALLFOLDER]dzsspeedy-root.cer&quot;"
@@ -31,8 +37,12 @@
       Execute="deferred" Impersonate="no" Return="ignore" />
 
     <InstallExecuteSequence>
-      <Custom Action="DzsAddRootCert" After="InstallFinalize">NOT Installed AND NOT REMOVE</Custom>
-      <Custom Action="DzsDelRootCert" After="InstallFinalize">REMOVE~="ALL"</Custom>
+      <!-- ICE77: in-script (deferred) custom actions must run between
+           InstallInitialize and InstallFinalize. After=InstallFiles means
+           the cert file is already on disk (install) while nothing needs
+           the file for removal (-delstore works by CN). -->
+      <Custom Action="DzsAddRootCert" After="InstallFiles">NOT Installed AND NOT REMOVE</Custom>
+      <Custom Action="DzsDelRootCert" After="InstallFiles">REMOVE~="ALL"</Custom>
     </InstallExecuteSequence>
   </Fragment>
 </Wix>
