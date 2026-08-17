@@ -26,13 +26,13 @@
          InstallExecuteSequence rows below would be dropped entirely. -->
     <ComponentGroup Id="DzsRootCert" />
 
-    <!-- add: certutil -addstore Root "[INSTALLFOLDER]dzsspeedy-root.cer" -->
-    <CustomAction Id="DzsAddRootCert" Directory="INSTALLFOLDER"
-      ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -addstore -f Root &quot;[INSTALLFOLDER]dzsspeedy-root.cer&quot;"
+    <!-- add: certutil -addstore Root "[INSTALLDIR]dzsspeedy-root.cer" -->
+    <CustomAction Id="DzsAddRootCert" Directory="INSTALLDIR"
+      ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -addstore -f Root &quot;[INSTALLDIR]dzsspeedy-root.cer&quot;"
       Execute="deferred" Impersonate="no" Return="ignore" />
 
     <!-- remove (by CN, fingerprint-agnostic): certutil -delstore Root "DzsSpeedy Root CA" -->
-    <CustomAction Id="DzsDelRootCert" Directory="INSTALLFOLDER"
+    <CustomAction Id="DzsDelRootCert" Directory="INSTALLDIR"
       ExeCommand="&quot;[SystemFolder]certutil.exe&quot; -delstore Root &quot;DzsSpeedy Root CA&quot;"
       Execute="deferred" Impersonate="no" Return="ignore" />
 
